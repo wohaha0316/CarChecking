@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/bsRoot"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- 저장 범위 -->
+        <Switch
+            android:id="@+id/swScope"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="이 파일만 적용 (끄면 앱 전체 적용)"
+            android:checked="true"
+            android:paddingBottom="8dp" />
+
+        <!-- ===== 열 너비 ===== -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="열 너비(%)"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <TextView android:id="@+id/tvWNo" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="No 폭 8%" />
+        <SeekBar android:id="@+id/sbWNo" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvWBL" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="B/L 폭 18%" />
+        <SeekBar android:id="@+id/sbWBL" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvWHaju" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="화주 폭 18%" />
+        <SeekBar android:id="@+id/sbWHaju" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvWCar" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="차량정보 폭 36%" />
+        <SeekBar android:id="@+id/sbWCar" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvWQty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="수(Qty) 폭 10%" />
+        <SeekBar android:id="@+id/sbWQty" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvWClear" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="면장 폭 10%" />
+        <SeekBar android:id="@+id/sbWClear" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvWCheck" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="확인 폭 10%" />
+        <SeekBar android:id="@+id/sbWCheck" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <!-- ===== 글자 크기 ===== -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="글자 크기(sp)"
+            android:textStyle="bold"
+            android:paddingTop="12dp"/>
+
+        <TextView android:id="@+id/tvFNo" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="No 글자 11" />
+        <SeekBar android:id="@+id/sbFNo" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvFBL" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="B/L 글자 13" />
+        <SeekBar android:id="@+id/sbFBL" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvFHaju" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="화주 글자 13" />
+        <SeekBar android:id="@+id/sbFHaju" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvFCar" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="차량정보 글자 13" />
+        <SeekBar android:id="@+id/sbFCar" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvFQty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="수(Qty) 글자 12" />
+        <SeekBar android:id="@+id/sbFQty" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvFClear" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="면장 글자 12" />
+        <SeekBar android:id="@+id/sbFClear" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <TextView android:id="@+id/tvFCheck" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="확인 글자 12" />
+        <SeekBar android:id="@+id/sbFCheck" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+        <!-- 줄바꿈/스타일 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="12dp">
+
+            <Switch
+                android:id="@+id/swWrapBL"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="B/L 줄바꿈" />
+
+            <Switch
+                android:id="@+id/swWrapHaju"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="화주 줄바꿈" />
+        </LinearLayout>
+
+        <Switch
+            android:id="@+id/swVinBold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="VIN(17자) 굵게" />
+
+        <!-- 행간 / Divider -->
+        <TextView
+            android:id="@+id/tvRowSpacing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="행간 35%"
+            android:textStyle="bold"
+            android:paddingTop="12dp" />
+        <SeekBar
+            android:id="@+id/sbRowSpacing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="70" />
+
+        <Switch
+            android:id="@+id/swRowDivider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="기본 행 구분선(실선) 표시" />
+
+        <!-- 하단 버튼 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:paddingTop="16dp"
+            android:paddingBottom="4dp">
+
+            <Button
+                android:id="@+id/btnReset"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="기본값 복귀" />
+
+            <Button
+                android:id="@+id/btnClose"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="닫기"
+                android:layout_marginStart="12dp" />
+
+            <Button
+                android:id="@+id/btnApply"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="적용"
+                android:layout_marginStart="12dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_excel"
+        android:title="엑셀업로드"
+        android:icon="@android:drawable/ic_menu_upload" />
+    <item
+        android:id="@+id/nav_task"
+        android:title="차량업무"
+        android:icon="@android:drawable/ic_menu_manage" />
+    <item
+        android:id="@+id/nav_blank"
+        android:title="미정"
+        android:icon="@android:drawable/ic_menu_help" />
+</menu>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="40dp"
+    android:background="#DDDDDD">
+
+    <!-- No -->
+    <TextView
+        android:id="@+id/tvNoHeader"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="8"
+        android:gravity="center"
+        android:text="No"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:paddingStart="4dp"
+        android:paddingEnd="2dp"/>
+
+    <TextView
+        android:id="@+id/tvBLHeader"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="18"
+        android:gravity="center"
+        android:text="B/L"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/tvHajuHeader"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="18"
+        android:gravity="center"
+        android:text="화주"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/tvCarInfoHeader"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="36"
+        android:gravity="center"
+        android:text="차량정보"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/tvQtyHeader"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="10"
+        android:gravity="center"
+        android:text="수"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/tvClearanceHeader"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="10"
+        android:gravity="center"
+        android:text="면장"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/tvCheckHeader"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="10"
+        android:gravity="center"
+        android:text="확인"
+        android:textStyle="bold"/>
+</LinearLayout>

@@ -1,0 +1,13 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <Spinner
+        android:id="@+id/spinnerShip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- 추후: 엑셀 내용 표시 & 간편보기 전환 버튼 -->
+</LinearLayout>

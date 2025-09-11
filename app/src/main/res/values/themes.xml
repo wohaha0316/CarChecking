@@ -1,0 +1,10 @@
+<resources>
+    <!-- 전체 앱 기본 테마 -->
+    <style name="Theme.CarChecking" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 필요 시 색/폰트 커스텀 -->
+    </style>
+
+    <!-- 바텀시트 전용 오버레이 -->
+    <style name="ThemeOverlay.CarChecking.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog"/>
+
+</resources>
