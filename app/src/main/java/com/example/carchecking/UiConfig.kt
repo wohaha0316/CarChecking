@@ -1,69 +1,48 @@
 package com.example.carchecking
 
 data class UiConfig(
-    // 열 너비(weight)
+    // 가중치(가로 폭). 합계는 normalized()에서 1로 정규화
     var wNo: Float = 0.08f,
     var wBL: Float = 0.18f,
     var wHaju: Float = 0.18f,
     var wCar: Float = 0.36f,
-    var wQty: Float = 0.10f,
-    var wClear: Float = 0.10f,
-    var wCheck: Float = 0.10f,
+    var wQty: Float = 0.08f,
+    var wClear: Float = 0.06f,
+    var wCheck: Float = 0.06f,
+
     // 글자 크기(sp)
     var fNo: Float = 11f,
     var fBL: Float = 13f,
     var fHaju: Float = 13f,
     var fCar: Float = 13f,
-    var fQty: Float = 12f,
-    var fClear: Float = 12f,
-    var fCheck: Float = 12f,
+    var fQty: Float = 13f,
+    var fClear: Float = 13f,
+    var fCheck: Float = 13f,
+
     // 줄바꿈 옵션
     var wrapBL: Boolean = false,
     var wrapHaju: Boolean = false,
-    // VIN 굵게
-    var vinBold: Boolean = true,
-    // 행간(행 하단 여백 계수: fCar * rowSpacing)
-    var rowSpacing: Float = 0.35f,
-    // 기본(RV) 구분선 표시
-    var showRowDividers: Boolean = false
-) {
-    private fun clampWeights(): UiConfig = copy(
-        wNo = wNo.coerceIn(0.04f, 0.40f),
-        wBL = wBL.coerceIn(0.06f, 0.50f),
-        wHaju = wHaju.coerceIn(0.06f, 0.50f),
-        wCar = wCar.coerceIn(0.20f, 0.70f),
-        wQty = wQty.coerceIn(0.06f, 0.25f),
-        wClear = wClear.coerceIn(0.06f, 0.25f),
-        wCheck = wCheck.coerceIn(0.06f, 0.30f)
-    )
 
-    /** weight 합이 1.0이 되도록 정규화 — 가로 스크롤 원천 차단 */
-    private fun renormWeights(): UiConfig {
-        val sum = (wNo + wBL + wHaju + wCar + wQty + wClear + wCheck).coerceAtLeast(0.0001f)
-        return copy(
-            wNo = wNo / sum,
-            wBL = wBL / sum,
-            wHaju = wHaju / sum,
-            wCar = wCar / sum,
-            wQty = wQty / sum,
-            wClear = wClear / sum,
-            wCheck = wCheck / sum
-        )
+    // 행간(상대). 0 = 여백 없음 (기본 0)
+    var rowSpacing: Float = 0f,
+
+    // 구분선
+    var showRowDividers: Boolean = true,
+
+    // ★ VIN 강조 여부 (SettingsBottomSheet에서 쓰는 필드)
+    var vinBold: Boolean = true
+) {
+    fun normalized(): UiConfig {
+        val sum = (wNo + wBL + wHaju + wCar + wQty + wClear + wCheck).let { if (it <= 0f) 1f else it }
+        wNo /= sum; wBL /= sum; wHaju /= sum; wCar /= sum; wQty /= sum; wClear /= sum; wCheck /= sum
+
+        fun clampW(x: Float) = if (x.isFinite() && x > 0f) x else 0.1f
+        wNo = clampW(wNo); wBL = clampW(wBL); wHaju = clampW(wHaju); wCar = clampW(wCar)
+        wQty = clampW(wQty); wClear = clampW(wClear); wCheck = clampW(wCheck)
+
+        if (rowSpacing < 0f) rowSpacing = 0f
+        return this
     }
 
-    private fun clampFonts(): UiConfig = copy(
-        fNo = fNo.coerceIn(8f, 20f),
-        fBL = fBL.coerceIn(8f, 26f),
-        fHaju = fHaju.coerceIn(8f, 26f),
-        fCar = fCar.coerceIn(8f, 26f),
-        fQty = fQty.coerceIn(8f, 22f),
-        fClear = fClear.coerceIn(8f, 22f),
-        fCheck = fCheck.coerceIn(8f, 22f),
-        rowSpacing = rowSpacing.coerceIn(0.10f, 0.80f)
-    )
-
-    fun normalized(): UiConfig = clampWeights().renormWeights().clampFonts()
-    fun clamped(): UiConfig = normalized()
-
-    companion object { fun defaults() = UiConfig().normalized() }
+    companion object { fun defaults() = UiConfig() }
 }

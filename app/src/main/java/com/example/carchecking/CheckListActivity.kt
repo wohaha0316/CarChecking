@@ -79,6 +79,7 @@ class CheckListActivity : AppCompatActivity() {
         currentFile = File(path)
         keyId = ParsedCache.keyFor(currentFile).id()
         uiConfig = UiPrefs.load(this, keyId)
+        uiConfig.rowSpacing = 0f
         eventRepo = EventRepository(this) // ★ 추가
 
         showLoading(true)

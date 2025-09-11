@@ -3,69 +3,106 @@ package com.example.carchecking
 import android.content.Context
 
 object UiPrefs {
+    enum class Scope { FILE, APP }
+
     private const val PREF = "ui_prefs"
-    enum class Scope { APP, FILE }
+
+    private fun base(scope: Scope, fileKey: String?): String =
+        if (scope == Scope.FILE && !fileKey.isNullOrBlank()) "ui:file:$fileKey:" else "ui:app:"
 
     fun load(ctx: Context, fileKey: String?): UiConfig {
         val p = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-        fun gF(k: String, d: Float) = p.getFloat(k, d)
-        fun gB(k: String, d: Boolean) = p.getBoolean(k, d)
-        fun key(n: String) = if (fileKey != null) "$n:$fileKey" else n
+
+        // 파일 스코프 우선 → 없으면 앱 스코프 → 없으면 기본값
+        fun get(key: String, defF: Float, defB: Boolean? = null): Pair<Float, Boolean?> {
+            val fileV = p.all[key]               // 파일스코프 값
+            val appV  = p.all["ui:app:${key.substringAfterLast(':')}"] // 앱스코프 값
+            return when (fileV) {
+                is Float -> fileV to null
+                is Boolean -> defF to fileV
+                else -> when (appV) {
+                    is Float -> appV to null
+                    is Boolean -> defF to appV
+                    else -> defF to defB
+                }
+            }
+        }
+
+        val cfg = UiConfig.defaults()
+
+        // prefix들
+        val filePrefix = if (!fileKey.isNullOrBlank()) "ui:file:$fileKey:" else null
+        val appPrefix  = "ui:app:"
+
+        fun f(key: String, def: Float): Float {
+            return when {
+                filePrefix != null && p.contains(filePrefix + key) -> p.getFloat(filePrefix + key, def)
+                p.contains(appPrefix + key) -> p.getFloat(appPrefix + key, def)
+                else -> def
+            }
+        }
+        fun b(key: String, def: Boolean): Boolean {
+            return when {
+                filePrefix != null && p.contains(filePrefix + key) -> p.getBoolean(filePrefix + key, def)
+                p.contains(appPrefix + key) -> p.getBoolean(appPrefix + key, def)
+                else -> def
+            }
+        }
 
         return UiConfig(
-            wNo = gF(key("wNo"), 0.08f),
-            wBL = gF(key("wBL"), 0.18f),
-            wHaju = gF(key("wHaju"), 0.18f),
-            wCar = gF(key("wCar"), 0.36f),
-            wQty = gF(key("wQty"), 0.10f),
-            wClear = gF(key("wClear"), 0.10f),
-            wCheck = gF(key("wCheck"), 0.10f),
+            wNo = f("wNo", cfg.wNo),
+            wBL = f("wBL", cfg.wBL),
+            wHaju = f("wHaju", cfg.wHaju),
+            wCar = f("wCar", cfg.wCar),
+            wQty = f("wQty", cfg.wQty),
+            wClear = f("wClear", cfg.wClear),
+            wCheck = f("wCheck", cfg.wCheck),
 
-            fNo = gF(key("fNo"), 11f),
-            fBL = gF(key("fBL"), 13f),
-            fHaju = gF(key("fHaju"), 13f),
-            fCar = gF(key("fCar"), 13f),
-            fQty = gF(key("fQty"), 12f),
-            fClear = gF(key("fClear"), 12f),
-            fCheck = gF(key("fCheck"), 12f),
+            fNo = f("fNo", cfg.fNo),
+            fBL = f("fBL", cfg.fBL),
+            fHaju = f("fHaju", cfg.fHaju),
+            fCar = f("fCar", cfg.fCar),
+            fQty = f("fQty", cfg.fQty),
+            fClear = f("fClear", cfg.fClear),
+            fCheck = f("fCheck", cfg.fCheck),
 
-            wrapBL = gB(key("wrapBL"), false),
-            wrapHaju = gB(key("wrapHaju"), false),
-            vinBold = gB(key("vinBold"), true),
+            wrapBL = b("wrapBL", cfg.wrapBL),
+            wrapHaju = b("wrapHaju", cfg.wrapHaju),
 
-            rowSpacing = gF(key("rowSpacing"), 0.35f),
-            showRowDividers = gB(key("showRowDividers"), false)
-        ).clamped()
+            rowSpacing = f("rowSpacing", cfg.rowSpacing),
+            showRowDividers = b("showRowDividers", cfg.showRowDividers),
+
+            vinBold = b("vinBold", cfg.vinBold)
+        ).normalized()
     }
 
     fun save(ctx: Context, scope: Scope, fileKey: String?, cfg: UiConfig) {
-        val e = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
-        fun k(n: String) = if (scope == Scope.FILE && fileKey != null) "$n:$fileKey" else n
-        val c = cfg.clamped()
+        val p = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+        val prefix = base(scope, fileKey)
+        p.edit().apply {
+            putFloat(prefix + "wNo", cfg.wNo)
+            putFloat(prefix + "wBL", cfg.wBL)
+            putFloat(prefix + "wHaju", cfg.wHaju)
+            putFloat(prefix + "wCar", cfg.wCar)
+            putFloat(prefix + "wQty", cfg.wQty)
+            putFloat(prefix + "wClear", cfg.wClear)
+            putFloat(prefix + "wCheck", cfg.wCheck)
 
-        e.putFloat(k("wNo"), c.wNo)
-        e.putFloat(k("wBL"), c.wBL)
-        e.putFloat(k("wHaju"), c.wHaju)
-        e.putFloat(k("wCar"), c.wCar)
-        e.putFloat(k("wQty"), c.wQty)
-        e.putFloat(k("wClear"), c.wClear)
-        e.putFloat(k("wCheck"), c.wCheck)
+            putFloat(prefix + "fNo", cfg.fNo)
+            putFloat(prefix + "fBL", cfg.fBL)
+            putFloat(prefix + "fHaju", cfg.fHaju)
+            putFloat(prefix + "fCar", cfg.fCar)
+            putFloat(prefix + "fQty", cfg.fQty)
+            putFloat(prefix + "fClear", cfg.fClear)
+            putFloat(prefix + "fCheck", cfg.fCheck)
 
-        e.putFloat(k("fNo"), c.fNo)
-        e.putFloat(k("fBL"), c.fBL)
-        e.putFloat(k("fHaju"), c.fHaju)
-        e.putFloat(k("fCar"), c.fCar)
-        e.putFloat(k("fQty"), c.fQty)
-        e.putFloat(k("fClear"), c.fClear)
-        e.putFloat(k("fCheck"), c.fCheck)
+            putBoolean(prefix + "wrapBL", cfg.wrapBL)
+            putBoolean(prefix + "wrapHaju", cfg.wrapHaju)
 
-        e.putBoolean(k("wrapBL"), c.wrapBL)
-        e.putBoolean(k("wrapHaju"), c.wrapHaju)
-        e.putBoolean(k("vinBold"), c.vinBold)
+            putFloat(prefix + "rowSpacing", cfg.rowSpacing)
+            putBoolean(prefix + "showRowDividers", cfg.showRowDividers)
 
-        e.putFloat(k("rowSpacing"), c.rowSpacing)
-        e.putBoolean(k("showRowDividers"), c.showRowDividers)
-
-        e.apply()
+            putBoolean(prefix + "vinBold", cfg.vinBold) // ★ 추가
+        }.apply()
     }
 }

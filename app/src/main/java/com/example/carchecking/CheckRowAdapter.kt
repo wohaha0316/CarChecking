@@ -3,7 +3,6 @@ package com.example.carchecking
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Build
-import android.text.Layout
 import android.text.SpannableStringBuilder
 import android.text.TextUtils
 import android.text.style.StyleSpan
@@ -30,6 +29,7 @@ class CheckRowAdapter(
     private fun dp(v: View, dp: Float) = (dp * v.context.resources.displayMetrics.density).toInt()
     private fun spToPx(v: View, sp: Float) = (sp * v.context.resources.displayMetrics.scaledDensity).toInt()
 
+    @Suppress("WrongConstant")
     private fun tvTight(tv: TextView, sizeSp: Float, singleLine: Boolean, maxLines: Int) {
         tv.textSize = sizeSp
         tv.includeFontPadding = false
@@ -37,14 +37,19 @@ class CheckRowAdapter(
         tv.isSingleLine = singleLine
         tv.maxLines = maxLines
         tv.ellipsize = if (singleLine) TextUtils.TruncateAt.END else null
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            tv.breakStrategy = Layout.BREAK_STRATEGY_SIMPLE
-            tv.hyphenationFrequency = Layout.HYPHENATION_FREQUENCY_NONE
+            tv.breakStrategy =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                    android.graphics.text.LineBreaker.BREAK_STRATEGY_SIMPLE
+                else
+                    android.text.Layout.BREAK_STRATEGY_SIMPLE
+
+            tv.hyphenationFrequency = android.text.Layout.HYPHENATION_FREQUENCY_NONE
         }
     }
 
     private fun applyRowSpacing(v: View) {
-        // 행간 슬라이더(ui.rowSpacing) 값이 0이면 패딩 0
         val px = if (ui.rowSpacing <= 0f) 0 else spToPx(v, ui.fCar * ui.rowSpacing)
         v.setPadding(0, 0, 0, px)
     }
@@ -69,7 +74,6 @@ class CheckRowAdapter(
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = RecyclerView.LayoutParams(
                     RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT)
-                // 기본 패딩 제거 → 행 높이 최소화
                 setPadding(0, 0, 0, 0)
                 isBaselineAligned = false
                 gravity = Gravity.TOP
@@ -81,21 +85,20 @@ class CheckRowAdapter(
                 layoutParams = lpCenter(ui.wNo)
                 tvTight(this, ui.fNo, singleLine = true, maxLines = 1)
                 gravity = Gravity.CENTER
-                setPadding(0, 0, 0, 0) // 패딩 완전 제거
+                setPadding(0, 0, 0, 0)
                 setTextColor(Color.DKGRAY)
             }
             val bl = TextView(parent.context).apply {
                 layoutParams = lpTop(ui.wBL)
-                tvTight(this, ui.fBL, singleLine = !ui.wrapBL, maxLines = if (ui.wrapBL) Int.MAX_VALUE else 1)
+                tvTight(this, ui.fBL, singleLine = true, maxLines = 1) // 1줄 고정
             }
             val haju = TextView(parent.context).apply {
                 layoutParams = lpTop(ui.wHaju)
-                tvTight(this, ui.fHaju, singleLine = !ui.wrapHaju, maxLines = if (ui.wrapHaju) Int.MAX_VALUE else 1)
+                tvTight(this, ui.fHaju, singleLine = true, maxLines = 1) // 1줄 고정
             }
             val car = TextView(parent.context).apply {
                 layoutParams = lpTop(ui.wCar)
-                // 차량정보는 항상 여러 줄 허용 + 타이트
-                tvTight(this, ui.fCar, singleLine = false, maxLines = Int.MAX_VALUE)
+                tvTight(this, ui.fCar, singleLine = false, maxLines = Int.MAX_VALUE) // 여러줄
             }
             val qty = TextView(parent.context).apply {
                 layoutParams = lpTop(ui.wQty)
@@ -110,18 +113,13 @@ class CheckRowAdapter(
             val checkBtn = Button(parent.context).apply {
                 layoutParams = lpTop(ui.wCheck)
                 text = "확인"
-                // 버튼도 타이트하게
                 isAllCaps = false
                 isSingleLine = true
                 ellipsize = TextUtils.TruncateAt.END
                 textSize = ui.fCheck
                 includeFontPadding = false
-                // 행 높이 강제 방지: 최소 높이 0
-                minHeight = 0
-                minimumHeight = 0
-                // 패딩 최소화
+                minHeight = 0; minimumHeight = 0
                 setPadding(dp(this, 8f), dp(this, 2f), dp(this, 8f), dp(this, 2f))
-                // 기본 배경/색(변경은 기존 로직 유지)
                 setBackgroundColor(Color.LTGRAY)
             }
 
@@ -140,42 +138,41 @@ class CheckRowAdapter(
         }
         h as DataVH
 
-        // 행간(하단 패딩) 적용 — 기본은 0
         applyRowSpacing(h.itemView)
 
         // No
         val seqNum = rows.take(pos + 1).count { !it.isLabelRow }
         h.seq.text = seqNum.toString()
 
-        // B/L (마지막 3자리 굵게)
-        val blStr = item.bl
-        h.bl.text = if (blStr.length >= 3) {
-            SpannableStringBuilder(blStr).apply {
-                setSpan(StyleSpan(Typeface.BOLD), blStr.length - 3, blStr.length, 0)
+        // B/L: 줄바꿈 제거 + 마지막 3자리 굵게
+        val blRaw = item.bl.replace("\r\n", " ").replace('\n', ' ').replace('\r', ' ').trim()
+        h.bl.text = if (blRaw.length >= 3) {
+            SpannableStringBuilder(blRaw).apply {
+                setSpan(StyleSpan(Typeface.BOLD), blRaw.length - 3, blRaw.length, 0)
             }
-        } else blStr
+        } else blRaw
 
-        // 화주
-        h.haju.isSingleLine = !ui.wrapHaju
-        h.haju.maxLines = if (ui.wrapHaju) Int.MAX_VALUE else 1
-        h.haju.ellipsize = if (ui.wrapHaju) null else TextUtils.TruncateAt.END
-        h.haju.text = item.haju
+        // 화주: 줄바꿈 제거(1줄 고정)
+        val hajuRaw = item.haju.replace("\r\n", " ").replace('\n', ' ').replace('\r', ' ').trim()
+        h.haju.text = hajuRaw
 
-        // 차량정보: VIN 전체 굵게
-        val raw = item.carInfo.replace("\r\n", "\n").replace('\r', '\n')
-        h.car.text = SpannableStringBuilder(raw).also { ssb ->
-            val vinRegex = Regex("(?i)(?=([A-HJ-NPR-Z0-9]{17}))\\1")
-            vinRegex.findAll(raw).forEach { m ->
-                val st = m.range.first; val ed = m.range.last + 1
-                ssb.setSpan(StyleSpan(Typeface.BOLD), st, ed, 0)
+        // 차량정보: VIN 굵게(옵션)
+        val carRaw = item.carInfo.replace("\r\n", "\n").replace('\r', '\n')
+        if (ui.vinBold) {
+            h.car.text = SpannableStringBuilder(carRaw).also { ssb ->
+                val vinRegex = Regex("(?i)(?=([A-HJ-NPR-Z0-9]{17}))\\1")
+                vinRegex.findAll(carRaw).forEach { m ->
+                    val st = m.range.first; val ed = m.range.last + 1
+                    ssb.setSpan(StyleSpan(Typeface.BOLD), st, ed, 0)
+                }
             }
+        } else {
+            h.car.text = carRaw
         }
 
-        // 수 / 면장
         h.qty.text = item.qty
         h.clearance.text = item.clearance
 
-        // 확인 버튼 상태
         if (item.isChecked) {
             h.checkBtn.text = item.checkOrder.toString()
             h.checkBtn.setBackgroundColor(Color.parseColor("#CCFFCC"))
