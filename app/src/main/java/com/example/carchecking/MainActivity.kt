@@ -15,8 +15,8 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var fileListLayout: LinearLayout
     private lateinit var btnSelectExcel: Button
+    private lateinit var fileListLayout: LinearLayout
 
     // ✅ 엑셀 파일 선택 런처 (Activity 버전)
     private val pickExcelFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -40,14 +40,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        fileListLayout = findViewById(R.id.fileListLayout)
         btnSelectExcel = findViewById(R.id.btnSelectExcel)
+        fileListLayout = findViewById(R.id.fileListLayout)
 
         btnSelectExcel.setOnClickListener {
-            // ✅ 엑셀 MIME 타입만 선택
             pickExcelFile.launch(arrayOf(
-                "application/vnd.ms-excel", // .xls
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             ))
         }
 
@@ -56,11 +55,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // ✅ 차량관리 화면 다녀오면 현황 최신화
         renderSavedFiles()
     }
 
-    /** 내부 저장소의 엑셀 목록을 표시 */
     private fun renderSavedFiles() {
         fileListLayout.removeAllViews()
 
@@ -74,8 +71,7 @@ class MainActivity : AppCompatActivity() {
         files.forEach { addFileRow(it) }
     }
 
-    /** 한 파일에 대한 5개 버튼(2줄) 렌더링 */
-    private fun addFileRow(file: File) {
+    fun addFileRow(file: File) {
         // 그룹 컨테이너(테두리)
         val group = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -99,7 +95,7 @@ class MainActivity : AppCompatActivity() {
             text = file.name
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.7f)
             setOnClickListener {
-                // 원본 엑셀 외부앱으로 열기 (필요 시 내부 뷰어로 변경)
+                // 원본 엑셀 외부앱으로 열기
                 openInExternalExcel(file)
             }
         }
@@ -116,20 +112,15 @@ class MainActivity : AppCompatActivity() {
             text = "X"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.1f)
             setOnClickListener {
-                android.app.AlertDialog.Builder(this@MainActivity)
-                    .setTitle("삭제 확인")
-                    .setMessage("정말로 삭제하시겠습니까?")
-                    .setPositiveButton("삭제") { _, _ ->
-                        if (file.delete()) {
-                            fileListLayout.removeView(group)
-                            UploadedExcelStore.files.remove(file)
-                            Toast.makeText(this@MainActivity, "${file.name} 삭제됨", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(this@MainActivity, "삭제 실패", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    .setNegativeButton("취소", null)
-                    .show()
+                try {
+                    if (file.exists()) file.delete()
+                    UploadedExcelStore.files.removeAll { it.absolutePath == file.absolutePath }
+                    renderSavedFiles()
+                    Toast.makeText(this@MainActivity, "삭제 완료", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    Toast.makeText(this@MainActivity, "삭제 실패", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
@@ -137,7 +128,7 @@ class MainActivity : AppCompatActivity() {
         topRow.addView(logBtn)
         topRow.addView(delBtn)
 
-        // 2줄: 현상황(70) + 차체크(30)
+        // 2줄: 현황 버튼만(풀폭)
         val bottomRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -163,23 +154,46 @@ class MainActivity : AppCompatActivity() {
                     prefsOld.getInt("${file.absolutePath}|checked", 0))
                 "전체 <font color='#000000'>${total} 대</font>  " +
                         "면장X <font color='#FF0000'>${clearanceX} 대</font>  " +
-                        "확인 <font color='#0000FF'>${checked} 대</font>"
+                        "확인 <font color='#1E90FF'>${checked} 대</font>"
             }
 
         val statusBtn = Button(this).apply {
-            text = fromHtmlCompat(statusHtml)  // fromHtmlCompat == htmlSpanned 동일기능
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.7f)
-            gravity = Gravity.CENTER
-            textSize = 13f
+            text = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N)
+                android.text.Html.fromHtml(statusHtml, android.text.Html.FROM_HTML_MODE_LEGACY)
+            else
+                android.text.Html.fromHtml(statusHtml)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
             isAllCaps = false
             isSingleLine = true
             ellipsize = TextUtils.TruncateAt.END
             setOnClickListener { /* 클릭 없음 */ }
         }
+        bottomRow.addView(statusBtn)
+
+        // 3줄: 선적 체크(왼쪽) + 차체크(오른쪽)
+        val thirdRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                120
+            )
+        }
+
+        val shippingBtn = Button(this).apply {
+            text = "선적 체크"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.5f)
+            setOnClickListener {
+                Toast.makeText(this@MainActivity, "선적 체크: 추후 구현", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         val checkBtn = Button(this).apply {
             text = "차체크"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.3f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.5f)
             setOnClickListener {
                 val intent = Intent(this@MainActivity, CheckListActivity::class.java)
                 intent.putExtra("filePath", file.absolutePath)
@@ -187,11 +201,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        bottomRow.addView(statusBtn)
-        bottomRow.addView(checkBtn)
-
         group.addView(topRow)
         group.addView(bottomRow)
+        thirdRow.addView(shippingBtn)
+        thirdRow.addView(checkBtn)
+        group.addView(thirdRow)
         fileListLayout.addView(group)
     }
 
@@ -216,11 +230,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openInExternalExcel(file: File) {
-        val uri = FileProvider.getUriForFile(
-            this,
-            "$packageName.provider",
-            file
-        )
+        val uri = FileProvider.getUriForFile(this, "${packageName}.provider", file)
         val mime = if (file.name.endsWith(".xls", true))
             "application/vnd.ms-excel"
         else
