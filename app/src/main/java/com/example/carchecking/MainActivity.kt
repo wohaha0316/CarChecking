@@ -187,7 +187,9 @@ class MainActivity : AppCompatActivity() {
             text = "선적 체크"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.5f)
             setOnClickListener {
-                Toast.makeText(this@MainActivity, "선적 체크: 추후 구현", Toast.LENGTH_SHORT).show()
+                val intent = Intent(this@MainActivity, ShippingCheckActivity::class.java)
+                intent.putExtra("filePath", file.absolutePath)
+                startActivity(intent)
             }
         }
 
