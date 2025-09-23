@@ -62,6 +62,7 @@ class CheckListActivity : AppCompatActivity() {
     private var rowDivider: RecyclerView.ItemDecoration? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_check_list)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -274,7 +275,7 @@ class CheckListActivity : AppCompatActivity() {
         setW(R.id.tvHajuHeader, cfg.wHaju)
         setW(R.id.tvCarInfoHeader, cfg.wCar)
         setW(R.id.tvQtyHeader, cfg.wQty)
-        setW(R.id.tvClearanceHeader, cfg.wClear)
+        setW(R.id.tvClearHeader, cfg.wClear)
         setW(R.id.tvCheckHeader, cfg.wCheck)
     }
 
@@ -284,7 +285,7 @@ class CheckListActivity : AppCompatActivity() {
         val hdrHaju = findViewById<TextView>(R.id.tvHajuHeader)
         val hdrCar = findViewById<TextView>(R.id.tvCarInfoHeader)
         val hdrQty = findViewById<TextView>(R.id.tvQtyHeader)
-        val hdrClear = findViewById<TextView>(R.id.tvClearanceHeader)
+        val hdrClear = findViewById<TextView>(R.id.tvClearHeader)
         val hdrCheck = findViewById<TextView>(R.id.tvCheckHeader)
 
         fun toggle(key: SortKey) {

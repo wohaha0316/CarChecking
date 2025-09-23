@@ -6,17 +6,25 @@ import android.os.Build
 import android.text.SpannableStringBuilder
 import android.text.TextUtils
 import android.text.style.StyleSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.widget.TextViewCompat
 import androidx.recyclerview.widget.RecyclerView
 
+/**
+ * 차체크 화면 어댑터.
+ * - ‘확인’ 버튼 텍스트 자동맞춤(버튼 안에 딱 맞게)
+ * - 액티비티 의존 없음(캐스팅 제거)
+ * - 순번 부여/당겨오기를 어댑터 내부에서 수행
+ */
 class CheckRowAdapter(
     private var rows: List<CheckRow>,
-    var ui: UiConfig = UiConfig.defaults(),
+    var ui: UiConfig,
     private val onToggle: ((position: Int, newChecked: Boolean) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
@@ -57,13 +65,8 @@ class CheckRowAdapter(
     }
     private fun setChildVert(tv: TextView, center: Boolean) {
         (tv.layoutParams as? LinearLayout.LayoutParams)?.let { lp ->
-            if (center && lp.gravity != Gravity.CENTER_VERTICAL) {
-                lp.gravity = Gravity.CENTER_VERTICAL
-                tv.layoutParams = lp
-            } else if (!center && lp.gravity != Gravity.TOP) {
-                lp.gravity = Gravity.TOP
-                tv.layoutParams = lp
-            }
+            val newG = if (center) Gravity.CENTER_VERTICAL else Gravity.TOP
+            if (lp.gravity != newG) { lp.gravity = newG; tv.layoutParams = lp }
         }
     }
 
@@ -71,10 +74,11 @@ class CheckRowAdapter(
         return if (viewType == TYPE_LABEL) {
             val tv = TextView(parent.context).apply {
                 layoutParams = RecyclerView.LayoutParams(
-                    RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT)
+                    RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT
+                )
                 setPadding(dp(this, 12f), dp(this, 8f), dp(this, 12f), dp(this, 8f))
                 textSize = 15f
-                setBackgroundColor(Color.parseColor("#FFF2CC")) // TERMINAL 라벨
+                setBackgroundColor(Color.parseColor("#FFF2CC"))
                 isSingleLine = true
                 ellipsize = TextUtils.TruncateAt.MARQUEE
                 marqueeRepeatLimit = -1
@@ -86,69 +90,73 @@ class CheckRowAdapter(
             val row = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = RecyclerView.LayoutParams(
-                    RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT)
+                    RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT
+                )
                 setPadding(0, 0, 0, 0)
                 isBaselineAligned = false
                 gravity = Gravity.TOP
             }
 
             val seq = TextView(parent.context).apply {
-                layoutParams = lpCenter(ui.wNo) // 항상 중앙
+                layoutParams = lpCenter(ui.wNo)
                 tvTight(this, ui.fNo)
-                isSingleLine = true
-                maxLines = 1
+                isSingleLine = true; maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 gravity = Gravity.CENTER
-                setPadding(0, 0, 0, 0)
                 setTextColor(Color.DKGRAY)
             }
             val bl = TextView(parent.context).apply {
-                // 최초 배치: wrap 여부에 따라 상단/중앙 레이아웃
                 layoutParams = if (ui.wrapBL) lpTop(ui.wBL) else lpCenter(ui.wBL)
                 tvTight(this, ui.fBL)
+                isSingleLine = !ui.wrapBL
+                maxLines = if (ui.wrapBL) Int.MAX_VALUE else 1
+                ellipsize = if (ui.wrapBL) null else TextUtils.TruncateAt.END
+                setPadding(dp(this, 4f), dp(this, 2f), dp(this, 4f), dp(this, 2f))
             }
             val haju = TextView(parent.context).apply {
                 layoutParams = if (ui.wrapHaju) lpTop(ui.wHaju) else lpCenter(ui.wHaju)
                 tvTight(this, ui.fHaju)
+                isSingleLine = !ui.wrapHaju
+                maxLines = if (ui.wrapHaju) Int.MAX_VALUE else 1
+                ellipsize = if (ui.wrapHaju) null else TextUtils.TruncateAt.END
+                setPadding(dp(this, 4f), dp(this, 2f), dp(this, 4f), dp(this, 2f))
             }
             val car = TextView(parent.context).apply {
-                layoutParams = lpTop(ui.wCar) // 항상 상단 정렬(여러 줄)
+                layoutParams = lpTop(ui.wCar)
                 tvTight(this, ui.fCar)
-                isSingleLine = false
-                maxLines = Int.MAX_VALUE
-                ellipsize = null
+                isSingleLine = false; maxLines = Int.MAX_VALUE; ellipsize = null
             }
             val qty = TextView(parent.context).apply {
-                layoutParams = lpCenter(ui.wQty) // 중앙
+                layoutParams = lpCenter(ui.wQty)
                 tvTight(this, ui.fQty)
-                isSingleLine = true
-                maxLines = 1
-                gravity = Gravity.CENTER
+                isSingleLine = true; maxLines = 1; gravity = Gravity.CENTER
                 ellipsize = TextUtils.TruncateAt.END
             }
             val clearance = TextView(parent.context).apply {
-                layoutParams = lpCenter(ui.wClear) // 중앙
+                layoutParams = lpCenter(ui.wClear)
                 tvTight(this, ui.fClear)
-                isSingleLine = true
-                maxLines = 1
-                gravity = Gravity.CENTER
+                isSingleLine = true; maxLines = 1; gravity = Gravity.CENTER
                 ellipsize = TextUtils.TruncateAt.END
             }
             val checkBtn = Button(parent.context).apply {
-                layoutParams = lpCenter(ui.wCheck) // 중앙
+                layoutParams = lpCenter(ui.wCheck)
                 text = "확인"
                 isAllCaps = false
                 isSingleLine = true
-                ellipsize = TextUtils.TruncateAt.END
-                textSize = ui.fCheck
                 includeFontPadding = false
                 minHeight = 0; minimumHeight = 0
                 setPadding(dp(this, 8f), dp(this, 2f), dp(this, 8f), dp(this, 2f))
-                setBackgroundColor(Color.LTGRAY)
+                setBackgroundColor(Color.parseColor("#CCCCCC"))
+                setTextColor(Color.parseColor("#000000"))
+                // ✅ 텍스트 자동맞춤: 10sp ~ 14sp 범위
+                TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    this, 10, 14, 1, TypedValue.COMPLEX_UNIT_SP
+                )
             }
 
             row.addView(seq); row.addView(bl); row.addView(haju); row.addView(car)
             row.addView(qty); row.addView(clearance); row.addView(checkBtn)
+
             DataVH(row, seq, bl, haju, car, qty, clearance, checkBtn)
         }
     }
@@ -162,14 +170,12 @@ class CheckRowAdapter(
         }
         h as DataVH
 
-        // 행 패딩(행간)
         applyRowSpacing(h.itemView)
 
-        // No
         val seqNum = rows.take(pos + 1).count { !it.isLabelRow }
         h.seq.text = seqNum.toString()
 
-        // ---- B/L ----
+        // B/L 끝 3자리 굵게
         val blRawAll = item.bl.replace("\r\n", "\n").replace('\r', '\n')
         val blText = if (ui.wrapBL) blRawAll else blRawAll.replace("\n", " ")
         h.bl.apply {
@@ -178,20 +184,13 @@ class CheckRowAdapter(
                     setSpan(StyleSpan(Typeface.BOLD), blText.length - 3, blText.length, 0)
                 }
             } else blText
-
             isSingleLine = !ui.wrapBL
             maxLines = if (ui.wrapBL) Int.MAX_VALUE else 1
             ellipsize = if (ui.wrapBL) null else TextUtils.TruncateAt.END
-
-            // 세로 정렬: wrap 끄면 항상 중앙, 켜면 실제 1줄일 때만 중앙
-            if (!ui.wrapBL) {
-                setChildVert(this, center = true)
-            } else {
-                post { setChildVert(this, center = (lineCount <= 1)) }
-            }
+            setChildVert(this, center = !ui.wrapBL || !blRawAll.contains('\n'))
         }
 
-        // ---- 화주 ----
+        // 화주
         val hajuRawAll = item.haju.replace("\r\n", "\n").replace('\r', '\n')
         val hajuText = if (ui.wrapHaju) hajuRawAll else hajuRawAll.replace("\n", " ")
         h.haju.apply {
@@ -199,15 +198,10 @@ class CheckRowAdapter(
             isSingleLine = !ui.wrapHaju
             maxLines = if (ui.wrapHaju) Int.MAX_VALUE else 1
             ellipsize = if (ui.wrapHaju) null else TextUtils.TruncateAt.END
-
-            if (!ui.wrapHaju) {
-                setChildVert(this, center = true)
-            } else {
-                post { setChildVert(this, center = (lineCount <= 1)) }
-            }
+            setChildVert(this, center = !ui.wrapHaju || !hajuRawAll.contains('\n'))
         }
 
-        // ---- 차량정보: VIN 굵게(옵션) ---
+        // 차량정보(VIN 볼드 옵션)
         val carRaw = item.carInfo.replace("\r\n", "\n").replace('\r', '\n')
         if (ui.vinBold) {
             h.car.text = SpannableStringBuilder(carRaw).also { ssb ->
@@ -217,47 +211,54 @@ class CheckRowAdapter(
                     ssb.setSpan(StyleSpan(Typeface.BOLD), st, ed, 0)
                 }
             }
-        } else {
-            h.car.text = carRaw
-        }
+        } else h.car.text = carRaw
 
-        // 수 / 면장
         h.qty.text = item.qty
         h.clearance.text = item.clearance
-        // (qty/clear/seq/checkBtn은 이미 lpCenter로 중앙 배치)
 
-        // 확인 버튼 상태
+        val BLUE = Color.parseColor("#1E90FF")
+        val GREY = Color.parseColor("#CCCCCC")
+        val ON_PRIMARY = Color.parseColor("#FFFFFF")
+        val ON_GREY = Color.parseColor("#000000")
+
         if (item.isChecked) {
-            h.checkBtn.text = item.checkOrder.toString()
-            h.checkBtn.setBackgroundColor(Color.parseColor("#CCFFCC"))
-            h.checkBtn.setTextColor(Color.parseColor("#1E4620"))
+            h.checkBtn.text = item.checkOrder.takeIf { it > 0 }?.toString() ?: "확인"
+            h.checkBtn.setBackgroundColor(BLUE)
+            h.checkBtn.setTextColor(ON_PRIMARY)
             h.checkBtn.typeface = Typeface.DEFAULT_BOLD
         } else {
             h.checkBtn.text = "확인"
-            h.checkBtn.setBackgroundColor(Color.LTGRAY)
-            h.checkBtn.setTextColor(Color.BLACK)
+            h.checkBtn.setBackgroundColor(GREY)
+            h.checkBtn.setTextColor(ON_GREY)
             h.checkBtn.typeface = Typeface.DEFAULT
         }
 
+        // 클릭: 순번 관리(앞 번호 해제 시 뒤 번호 1씩 당김)
         h.checkBtn.setOnClickListener {
-            val act = h.itemView.context as CheckListActivity
             val nowChecked = !item.isChecked
+            val removedOrder = item.checkOrder
+
             if (nowChecked) {
-                act.orderCounter++
+                val nextOrder = (rows.filter { it.checkOrder > 0 }.maxOfOrNull { it.checkOrder } ?: 0) + 1
                 item.isChecked = true
-                item.checkOrder = act.orderCounter
+                item.checkOrder = nextOrder
             } else {
                 item.isChecked = false
                 item.checkOrder = 0
+                if (removedOrder > 0) {
+                    rows.forEach { r -> if (r.checkOrder > removedOrder) r.checkOrder -= 1 }
+                }
             }
-            onToggle?.invoke(h.adapterPosition, nowChecked)
-            act.reindexOrders()
+
+            onToggle?.invoke(h.bindingAdapterPosition, nowChecked)
+            notifyDataSetChanged()
         }
     }
 
     override fun getItemCount() = rows.size
+
     fun updateData(newRows: List<CheckRow>) { rows = newRows; notifyDataSetChanged() }
-    fun updateUi(newUi: UiConfig) { ui = newUi.normalized(); notifyDataSetChanged() }
+    fun updateUi(newUi: UiConfig) { ui = newUi; notifyDataSetChanged() }
 
     class DataVH(
         row: View,

@@ -1,199 +1,169 @@
 package com.example.carchecking
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Bundle
+import android.text.Html
+import android.view.Gravity
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import org.apache.poi.ss.usermodel.WorkbookFactory
 import java.io.File
-import java.io.FileInputStream
-import java.security.MessageDigest
 import java.util.Locale
 
 class ShippingCheckActivity : AppCompatActivity() {
 
-    private lateinit var rv: RecyclerView
-    private lateinit var file: File
+    private lateinit var prefs: SharedPreferences
     private lateinit var keyId: String
+    private lateinit var currentFile: File
+
+    private lateinit var tvStatus: TextView
+    private lateinit var rv: RecyclerView
+
+    private var rows: List<CheckRow> = emptyList()
+
+    private val PREF_NAME = "carchecking_prefs"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_shipping_check)
 
-        val path = intent.getStringExtra("filePath")
-        if (path.isNullOrBlank()) {
-            Toast.makeText(this, "파일 경로 누락", Toast.LENGTH_SHORT).show()
-            finish(); return
-        }
-        file = File(path)
-        keyId = try {
-            // 프로젝트에 ParsedCache가 있으면 동일 키를 사용
-            ParsedCache.keyFor(file).id()
-        } catch (_: Throwable) {
-            // 폴백: 파일 경로 MD5
-            md5(file.absolutePath)
-        }
-
+        tvStatus = findViewById(R.id.tvStatus)
         rv = findViewById(R.id.rvShipping)
         rv.layoutManager = LinearLayoutManager(this)
         rv.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
 
-        val rows = runCatching { parseExcelForShipping(file) }
-            .getOrElse {
-                it.printStackTrace()
-                Toast.makeText(this, "엑셀 파싱 실패", Toast.LENGTH_SHORT).show()
-                emptyList()
-            }
+        prefs = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+
+        val path = intent.getStringExtra("filePath")
+        if (path.isNullOrBlank()) { toast("파일 경로 없음"); finish(); return }
+        currentFile = File(path)
+        if (!currentFile.exists()) { toast("파일이 존재하지 않음"); finish(); return }
+
+        keyId = ParsedCache.keyFor(currentFile).id()
+
+        rows = runCatching { CarCheckExcelParser.parse(currentFile) }
+            .onFailure { it.printStackTrace() }
+            .getOrElse { toast("엑셀 읽기 오류"); emptyList() }
 
         rv.adapter = ShippingRowAdapter(
-            context = this,
-            keyId = keyId,
             rows = rows,
-            onToggleShip = { rowIndex, newValue ->
-                saveShipState(keyId, rowIndex, newValue)
-            },
-            readChecked = { rowIndex ->
-                // 차체크(기존 확인) 상태를 여러 가능 키로 조회 → 가능하면 O, 아니면 X
-                readCheckedState(keyId, rowIndex)
-            },
-            readShip = { rowIndex ->
-                readShipState(keyId, rowIndex)
-            }
+            readChecked = { idx -> readCheckedState(idx) },
+            readCheckedOrder = { idx -> readCheckedOrder(idx) },  // ✅ 확인 순번 전달
+            readShip = { idx -> readShipState(idx) },
+            readShipOrder = { idx -> readShipOrder(idx) },
+            onToggleShip = { idx -> toggleShip(idx) }
         )
+
+        updateStatus()
     }
 
-    // ====== 선적 상태 저장/조회 (SharedPreferences) ======
-    private fun shipPrefs(): SharedPreferencesEx =
-        SharedPreferencesEx(getSharedPreferences("carchecking_prefs", Context.MODE_PRIVATE))
+    // ===== 현황판 =====
+    private fun updateStatus() {
+        val total = rows.count { !it.isLabelRow }
+        val noClearCount = rows.indices.count { !rows[it].isLabelRow && isClearanceX(rows[it].clearance) }
+        val checked = rows.indices.count { !rows[it].isLabelRow && readCheckedState(it) }
+        val shipped = rows.indices.count { !rows[it].isLabelRow && readShipState(it) }
 
-    private fun saveShipState(keyId: String, rowIndex: Int, v: Boolean) {
-        val p = shipPrefs()
-        p.putBoolean("ship:$keyId:$rowIndex", v)
-        // 필요하면 현황 집계 업데이트도 여기서 가능(요청 시 추가 구현)
+        val html = "전체 <b>${pad2(total)}대</b>  " +
+                "<font color='#CC0000'>면장X <b>${pad2(noClearCount)}대</b></font>  " +  // ✅ 붉은색
+                "<font color='#1E90FF'>확인 <b>${pad2(checked)}대</b></font>  " +
+                "<font color='#008000'>선적 <b>${pad2(shipped)}대</b></font>"
+
+        tvStatus.text = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N)
+            Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY)
+        else Html.fromHtml(html)
+        tvStatus.gravity = Gravity.CENTER_HORIZONTAL
     }
-    private fun readShipState(keyId: String, rowIndex: Int): Boolean {
-        val p = shipPrefs()
-        // 우선 신규 키
-        var v = p.getBoolean("ship:$keyId:$rowIndex", false)
-        if (!v) {
-            // 혹시 과거 키를 쓴 적이 있다면 추가 탐색
-            v = p.getBoolean("shipping:$keyId:$rowIndex", false)
+
+    private fun pad2(v: Int) = String.format(Locale.US, "%02d", v)
+
+    private fun isClearanceX(c: String): Boolean {
+        val t = c.trim().lowercase(Locale.ROOT)
+        return t in setOf("x","미통관","n","0","x표시","면장x","미처리","미")
+    }
+
+    // ===== 선적 상태 저장/조회 (순번 카운팅 유지) =====
+    private fun readShipState(idx: Int): Boolean =
+        prefs.getBoolean("ship_orders:${keyId}:${idx}_shipped", false)
+
+    private fun readShipOrder(idx: Int): Int =
+        prefs.getInt("ship_orders:${keyId}:${idx}_order", 0)
+
+    private fun saveShipState(idx: Int, shipped: Boolean, order: Int) {
+        prefs.edit()
+            .putBoolean("ship_orders:${keyId}:${idx}_shipped", shipped)
+            .putInt("ship_orders:${keyId}:${idx}_order", order)
+            .apply()
+    }
+
+    private fun clearShipState(idx: Int) {
+        prefs.edit()
+            .putBoolean("ship_orders:${keyId}:${idx}_shipped", false)
+            .putInt("ship_orders:${keyId}:${idx}_order", 0)
+            .apply()
+    }
+
+    private fun nextOrder(): Int {
+        val key = "ship_orders:${keyId}:orderCounter"
+        val next = prefs.getInt(key, 0) + 1
+        prefs.edit().putInt(key, next).apply()
+        return next
+    }
+
+    private fun decrementCounter() {
+        val key = "ship_orders:${keyId}:orderCounter"
+        val cur = prefs.getInt(key, 0)
+        if (cur > 0) prefs.edit().putInt(key, cur - 1).apply()
+    }
+
+    private fun renumberAfterRemoval(removedOrder: Int) {
+        if (removedOrder <= 0) return
+        val e = prefs.edit()
+        rows.indices.forEach { i ->
+            val ord = readShipOrder(i)
+            if (ord > removedOrder) e.putInt("ship_orders:${keyId}:${i}_order", ord - 1)
         }
-        return v
+        e.apply()
     }
 
-    // ====== 차체크(기존 확인) 상태 읽기 (읽기전용) ======
-    private fun readCheckedState(keyId: String, rowIndex: Int): Boolean {
-        // 신규/구키 모두 탐색
-        val pNew = getSharedPreferences("carchecking_prefs", Context.MODE_PRIVATE)
-        val pOld = getSharedPreferences("checklist_status", Context.MODE_PRIVATE)
-
-        val candidates = listOf(
-            "checked:$keyId:$rowIndex",
-            "check:$keyId:$rowIndex",
-            "${file.absolutePath}|checked:$rowIndex",
-            "${file.absolutePath}|row:$rowIndex|checked"
-        )
-        for (k in candidates) {
-            if (pNew.contains(k)) return pNew.getBoolean(k, false)
-            if (pOld.contains(k)) return pOld.getBoolean(k, false)
-        }
-        return false
-    }
-
-    // ====== 엑셀 파싱: 헤더 자동감지 후 필요한 컬럼만 ======
-    private fun parseExcelForShipping(file: File): List<ShipRow> {
-        FileInputStream(file).use { fis ->
-            val wb = WorkbookFactory.create(fis)
-            val sh = wb.getSheetAt(0)
-
-            // 헤더 찾기(상위 10행 안에서)
-            var headerRowIdx = -1
-            var idxNo = -1
-            var idxBL = -1
-            var idxCar = -1
-            var idxClr = -1
-            var idxQty = -1
-            var idxShipper = -1
-            for (r in 0..minOf(9, sh.lastRowNum)) {
-                val row = sh.getRow(r) ?: continue
-                val map = mutableMapOf<String, Int>()
-                for (c in 0..row.lastCellNum) {
-                    val name = cellText(row.getCell(c)).uppercase(Locale.ROOT).trim()
-                    when {
-                        name in listOf("NO", "순번") -> { idxNo = c; map["NO"] = c }
-                        name.contains("B/L") || name == "BL" -> { idxBL = c; map["BL"] = c }
-                        name.contains("차량") || name.contains("CAR") -> { idxCar = c; map["CAR"] = c }
-                        name.contains("면장") || name.contains("CLEAR") -> { idxClr = c; map["CLR"] = c }
-                        name.contains("수") || name.contains("QTY") -> { idxQty = c; map["QTY"] = c }
-                        name.contains("화주") || name.contains("SHIPPER") -> { idxShipper = c; map["SHIPPER"] = c }
-                    }
-                }
-                if (idxBL >= 0 && idxCar >= 0) {
-                    headerRowIdx = r
-                    break
-                }
-            }
-            if (headerRowIdx < 0) headerRowIdx = 0 // 폴백
-
-            val rows = mutableListOf<ShipRow>()
-            var noCounter = 1
-            for (r in headerRowIdx + 1..sh.lastRowNum) {
-                val row = sh.getRow(r) ?: continue
-                val bl = cellText(row.getCell(idxBL)).trim()
-                val car = cellText(row.getCell(idxCar)).trim()
-                val clr = if (idxClr >= 0) cellText(row.getCell(idxClr)).trim() else ""
-                val qty = if (idxQty >= 0) cellText(row.getCell(idxQty)).trim() else ""
-                val shipper = if (idxShipper >= 0) cellText(row.getCell(idxShipper)).trim() else ""
-
-                // 데이터 종료 판단(주요 필드가 비면 스킵)
-                if (bl.isBlank() && car.isBlank()) continue
-
-                rows.add(
-                    ShipRow(
-                        no = if (idxNo >= 0) cellText(row.getCell(idxNo)).trim().ifBlank { (noCounter++).toString() } else (noCounter++).toString(),
-                        bl = bl,
-                        carInfo = car,
-                        clearance = clr,
-                        qty = qty,
-                        shipper = shipper,
-                        rowIndex = r // 파일 내 원행 인덱스 사용
-                    )
-                )
-            }
-            return rows
+    // 클릭에서만 호출: 안전 갱신(post)로 레이아웃 중 notify 방지
+    private fun toggleShip(idx: Int): Pair<Boolean, Int> {
+        if (rows.getOrNull(idx)?.isLabelRow == true) return false to 0
+        val cur = readShipState(idx)
+        return if (!cur) {
+            val ord = nextOrder()
+            saveShipState(idx, true, ord)
+            safeNotifyItemChanged(idx)
+            updateStatus()
+            true to ord
+        } else {
+            val removedOrder = readShipOrder(idx)
+            clearShipState(idx)
+            renumberAfterRemoval(removedOrder)
+            decrementCounter()
+            safeNotifyItemChanged(idx)
+            updateStatus()
+            false to 0
         }
     }
 
-    private fun cellText(cell: org.apache.poi.ss.usermodel.Cell?): String {
-        if (cell == null) return ""
-        return when (cell.cellType) {
-            org.apache.poi.ss.usermodel.CellType.STRING -> cell.stringCellValue ?: ""
-            org.apache.poi.ss.usermodel.CellType.NUMERIC -> {
-                val d = cell.numericCellValue
-                if (d % 1.0 == 0.0) d.toLong().toString() else d.toString()
-            }
-            org.apache.poi.ss.usermodel.CellType.BOOLEAN -> if (cell.booleanCellValue) "TRUE" else "FALSE"
-            else -> cell.toString()
-        }
+    private fun safeNotifyItemChanged(idx: Int) {
+        val doNotify = { (rv.adapter as? ShippingRowAdapter)?.notifyItemChanged(idx) }
+        if (rv.isComputingLayout || rv.isLayoutRequested) rv.post { doNotify() } else doNotify()
     }
 
-    private fun md5(s: String): String {
-        val md = MessageDigest.getInstance("MD5").digest(s.toByteArray())
-        return md.joinToString("") { "%02x".format(it) }
-    }
+    // ===== 차체크(확인) 상태 =====
+    private fun readCheckedState(idx: Int): Boolean =
+        prefs.getBoolean("check_orders:${keyId}:${idx}_checked", false)
+
+    // ✅ 확인 순번(차체크에서 쓰던 값): 없으면 0
+    private fun readCheckedOrder(idx: Int): Int =
+        prefs.getInt("check_orders:${keyId}:${idx}_order", 0)
+
+    private fun toast(msg: String) =
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).apply { setGravity(Gravity.CENTER, 0, 0) }.show()
 }
-
-/** 표시용 행 데이터 (화주/수(QTY)는 보유하지만 화면엔 안씀) */
-data class ShipRow(
-    val no: String,
-    val bl: String,
-    val carInfo: String,
-    val clearance: String,
-    val qty: String,
-    val shipper: String,
-    val rowIndex: Int
-)

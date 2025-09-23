@@ -1,37 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="48dp"
-    android:weightSum="1" android:paddingStart="4dp" android:paddingEnd="4dp">
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingVertical="8dp"
+    android:paddingHorizontal="6dp">
 
     <TextView
-        android:id="@+id/tvNo"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.07"
-        android:gravity="center" android:textSize="12sp"/>
+        android:id="@+id/tvVin"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.32"
+        android:text="VIN"
+        android:textSize="12sp"/>
 
     <TextView
-        android:id="@+id/tvBL"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.22"
-        android:gravity="center_vertical|start" android:paddingStart="4dp" android:textSize="12sp"
-        android:maxLines="1" android:ellipsize="end"/>
+        android:id="@+id/tvOwner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.20"
+        android:text="화주"
+        android:textSize="12sp"/>
 
     <TextView
-        android:id="@+id/tvCarInfo"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.36"
-        android:gravity="center_vertical|start" android:paddingStart="4dp" android:textSize="12sp"
-        android:maxLines="1" android:ellipsize="end"/>
-
-    <TextView
-        android:id="@+id/tvClearance"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.12"
-        android:gravity="center" android:textSize="12sp"/>
+        android:id="@+id/tvModel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.24"
+        android:text="차종"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="12sp"/>
 
     <TextView
         android:id="@+id/tvChecked"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.11"
-        android:gravity="center" android:textSize="12sp" android:textStyle="bold"/>
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.12"
+        android:gravity="end"
+        android:text="미확인"
+        android:textSize="12sp"/>
+
+    <TextView
+        android:id="@+id/tvOrder"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="#0"
+        android:paddingEnd="6dp"
+        android:textSize="12sp"/>
 
     <Button
         android:id="@+id/btnShip"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.12"
-        android:text="선적"/>
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:minWidth="64dp"
+        android:text="선적"
+        android:textSize="12sp"/>
 </LinearLayout>

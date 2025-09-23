@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <color name="statusBlue">#1E90FF</color>
+    <color name="statusGreen">#008000</color>
+    <color name="statusRed">#FF0000</color>
+
+    <color name="chipGrey">#CCCCCC</color>
+    <color name="chipTextOnPrimary">#FFFFFF</color>
+    <color name="chipTextOnGrey">#000000</color>
+
+    <color name="sectionBg">#FFF2CC</color>
+</resources>

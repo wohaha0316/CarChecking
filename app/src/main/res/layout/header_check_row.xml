@@ -10,15 +10,13 @@
         android:id="@+id/tvNoHeader"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="8"
+        android:layout_weight="6"
         android:gravity="center"
         android:text="No"
         android:textSize="8sp"
-        android:textStyle="bold"
-        android:maxLines="1"
-        android:paddingStart="4dp"
-        android:paddingEnd="2dp"/>
+        android:textStyle="bold"/>
 
+    <!-- B/L -->
     <TextView
         android:id="@+id/tvBLHeader"
         android:layout_width="0dp"
@@ -28,6 +26,7 @@
         android:text="B/L"
         android:textStyle="bold"/>
 
+    <!-- 화주 -->
     <TextView
         android:id="@+id/tvHajuHeader"
         android:layout_width="0dp"
@@ -37,6 +36,7 @@
         android:text="화주"
         android:textStyle="bold"/>
 
+    <!-- 차량정보 -->
     <TextView
         android:id="@+id/tvCarInfoHeader"
         android:layout_width="0dp"
@@ -46,24 +46,27 @@
         android:text="차량정보"
         android:textStyle="bold"/>
 
+    <!-- 수 -->
     <TextView
         android:id="@+id/tvQtyHeader"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="10"
+        android:layout_weight="6"
         android:gravity="center"
         android:text="수"
         android:textStyle="bold"/>
 
+    <!-- 면장 -->
     <TextView
-        android:id="@+id/tvClearanceHeader"
+        android:id="@+id/tvClearHeader"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="10"
+        android:layout_weight="6"
         android:gravity="center"
         android:text="면장"
         android:textStyle="bold"/>
 
+    <!-- 확인 -->
     <TextView
         android:id="@+id/tvCheckHeader"
         android:layout_width="0dp"

@@ -1,23 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="40dp"
-    android:background="#DDDDDD" android:weightSum="1">
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="40dp"
+    android:background="#EEEEEE"
+    android:weightSum="1"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
 
-    <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.07"
-        android:gravity="center" android:text="No" android:textStyle="bold" android:textSize="12sp"/>
+    <!-- No -->
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.08"
+        android:gravity="center"
+        android:text="No"
+        android:textStyle="bold"
+        android:textSize="12sp"/>
 
-    <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.22"
-        android:gravity="center" android:text="B/L" android:textStyle="bold" android:textSize="12sp"/>
+    <!-- B/L -->
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.18"
+        android:gravity="center_vertical|start"
+        android:paddingStart="4dp"
+        android:text="B/L"
+        android:textStyle="bold"
+        android:textSize="12sp"/>
 
-    <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.36"
-        android:gravity="center" android:text="차량정보" android:textStyle="bold" android:textSize="12sp"/>
+    <!-- 차대번호 (VIN) -->
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.36"
+        android:gravity="center_vertical|start"
+        android:paddingStart="4dp"
+        android:text="차대번호"
+        android:textStyle="bold"
+        android:textSize="12sp"/>
 
-    <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.12"
-        android:gravity="center" android:text="면장" android:textStyle="bold" android:textSize="12sp"/>
+    <!-- 면장 -->
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.12"
+        android:gravity="center"
+        android:text="면장"
+        android:textStyle="bold"
+        android:textSize="12sp"/>
 
-    <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.11"
-        android:gravity="center" android:text="확인" android:textStyle="bold" android:textSize="12sp"/>
+    <!-- 확인 -->
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.10"
+        android:gravity="center"
+        android:text="확인"
+        android:textStyle="bold"
+        android:textSize="12sp"/>
 
-    <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.12"
-        android:gravity="center" android:text="선적" android:textStyle="bold" android:textSize="12sp"/>
+    <!-- 선적 -->
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="0.16"
+        android:gravity="center"
+        android:text="선적"
+        android:textStyle="bold"
+        android:textSize="12sp"/>
 </LinearLayout>

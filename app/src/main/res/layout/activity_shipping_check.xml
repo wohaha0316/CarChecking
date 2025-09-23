@@ -1,14 +1,89 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent">
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:baselineAligned="false"
+    android:padding="8dp">
 
-    <!-- 헤더 -->
-    <include layout="@layout/header_shipping_row"/>
+    <!-- 현황판: 중앙정렬 / 면장X=붉은색, 확인=파랑, 선적=초록 -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="40dp"
+        android:gravity="center"
+        android:text="전체 00대  면장X 00대  확인 00대  선적 00대"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="6dp"
+        android:background="#EEEEEE" />
 
-    <!-- 리스트 -->
+    <!-- 헤더 (열 너비: NO 0.06 / BL 0.26 / VIN 0.32 / 면장 0.14 / 확인 0.10 / 선적 0.10) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:background="#DDDDDD"
+        android:paddingHorizontal="6dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.06"
+            android:gravity="center_vertical"
+            android:text="No"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.26"
+            android:gravity="center_vertical"
+            android:text="B/L"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.32"
+            android:gravity="center_vertical"
+            android:text="차대번호"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.14"
+            android:gravity="end|center_vertical"
+            android:text="면장"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.10"
+            android:gravity="end|center_vertical"
+            android:text="확인"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.10"
+            android:gravity="end|center_vertical"
+            android:text="선적"
+            android:textStyle="bold"/>
+    </LinearLayout>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvShipping"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp" />
 </LinearLayout>
