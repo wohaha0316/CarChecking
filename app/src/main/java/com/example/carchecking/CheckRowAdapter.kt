@@ -102,7 +102,9 @@ class CheckRowAdapter(
                 tvTight(this, ui.fNo)
                 isSingleLine = true; maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, 0)                           // ◀ 좌측 패딩 0
+                textAlignment = View.TEXT_ALIGNMENT_VIEW_START   // ◀ 왼쪽 정렬
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
                 setTextColor(Color.DKGRAY)
             }
             val bl = TextView(parent.context).apply {
@@ -125,6 +127,7 @@ class CheckRowAdapter(
                 layoutParams = lpTop(ui.wCar)
                 tvTight(this, ui.fCar)
                 isSingleLine = false; maxLines = Int.MAX_VALUE; ellipsize = null
+                setPadding(0, 0, dp(this, 2f), 0)   // ◀ 오른쪽 패딩만 2dp
             }
             val qty = TextView(parent.context).apply {
                 layoutParams = lpCenter(ui.wQty)
@@ -222,14 +225,14 @@ class CheckRowAdapter(
         val ON_GREY = Color.parseColor("#000000")
 
         if (item.isChecked) {
-            h.checkBtn.text = item.checkOrder.takeIf { it > 0 }?.toString() ?: "확인"
-            h.checkBtn.setBackgroundColor(BLUE)
-            h.checkBtn.setTextColor(ON_PRIMARY)
+            h.checkBtn.text = item.checkOrder.takeIf { it > 0 }?.toString() ?: ""
+            h.checkBtn.setBackgroundColor(Color.parseColor("#1E90FF"))
+            h.checkBtn.setTextColor(Color.parseColor("#FFFFFF"))
             h.checkBtn.typeface = Typeface.DEFAULT_BOLD
         } else {
-            h.checkBtn.text = "확인"
-            h.checkBtn.setBackgroundColor(GREY)
-            h.checkBtn.setTextColor(ON_GREY)
+            h.checkBtn.text = ""                 // ◀ 미확인 시 텍스트 제거
+            h.checkBtn.setBackgroundColor(Color.parseColor("#CCCCCC"))
+            h.checkBtn.setTextColor(Color.parseColor("#000000"))
             h.checkBtn.typeface = Typeface.DEFAULT
         }
 

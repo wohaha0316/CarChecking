@@ -10,7 +10,7 @@
         android:id="@+id/tvNoHeader"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="6"
+        android:layout_weight="5"
         android:gravity="center"
         android:text="No"
         android:textSize="8sp"
@@ -41,7 +41,7 @@
         android:id="@+id/tvCarInfoHeader"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="36"
+        android:layout_weight="32"
         android:gravity="center"
         android:text="차량정보"
         android:textStyle="bold"/>
@@ -51,7 +51,7 @@
         android:id="@+id/tvQtyHeader"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="6"
+        android:layout_weight="5"
         android:gravity="center"
         android:text="수"
         android:textStyle="bold"/>
@@ -61,7 +61,7 @@
         android:id="@+id/tvClearHeader"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="6"
+        android:layout_weight="7"
         android:gravity="center"
         android:text="면장"
         android:textStyle="bold"/>
@@ -71,7 +71,7 @@
         android:id="@+id/tvCheckHeader"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="10"
+        android:layout_weight="16"
         android:gravity="center"
         android:text="확인"
         android:textStyle="bold"/>

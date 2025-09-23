@@ -5,10 +5,10 @@ data class UiConfig(
     var wNo: Float = 0.05f,
     var wBL: Float = 0.18f,
     var wHaju: Float = 0.18f,
-    var wCar: Float = 0.30f,
-    var wQty: Float = 0.06f,
-    var wClear: Float = 0.06f,
-    var wCheck: Float = 0.14f,
+    var wCar: Float = 0.30f,  // 기존 유지(필요 시 말해)
+    var wQty: Float = 0.05f,
+    var wClear: Float = 0.07f,
+    var wCheck: Float = 0.16f, // 4번과 세트
 
     // 글자 크기(sp)
     var fNo: Float = 11f,
