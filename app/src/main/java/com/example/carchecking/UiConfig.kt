@@ -8,7 +8,7 @@ data class UiConfig(
     var wCar: Float = 0.30f,
     var wQty: Float = 0.06f,
     var wClear: Float = 0.06f,
-    var wCheck: Float = 0.12f,
+    var wCheck: Float = 0.14f,
 
     // 글자 크기(sp)
     var fNo: Float = 11f,

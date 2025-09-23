@@ -28,13 +28,13 @@
         android:orientation="horizontal"
         android:background="#DDDDDD"
         android:paddingHorizontal="6dp"
-        android:gravity="center_vertical">
+        android:gravity="center">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="0.06"
-            android:gravity="center_vertical"
+            android:gravity="center"
             android:text="No"
             android:textStyle="bold"/>
 
@@ -42,7 +42,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="0.26"
-            android:gravity="center_vertical"
+            android:gravity="center"
             android:text="B/L"
             android:textStyle="bold"/>
 
@@ -50,31 +50,31 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="0.32"
-            android:gravity="center_vertical"
+            android:gravity="center"
             android:text="차대번호"
             android:textStyle="bold"/>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="0.14"
-            android:gravity="end|center_vertical"
+            android:layout_weight="0.06"
+            android:gravity="center"
             android:text="면장"
             android:textStyle="bold"/>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="0.10"
-            android:gravity="end|center_vertical"
+            android:layout_weight="0.14"
+            android:gravity="center"
             android:text="확인"
             android:textStyle="bold"/>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="0.10"
-            android:gravity="end|center_vertical"
+            android:layout_weight="0.14"
+            android:gravity="center"
             android:text="선적"
             android:textStyle="bold"/>
     </LinearLayout>

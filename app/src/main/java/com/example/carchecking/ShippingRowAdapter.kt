@@ -81,18 +81,36 @@ class ShippingRowAdapter(
             }
 
             // NO (+2sp: 14)
+// NO (+2sp: 14)
             val tvNo = TextView(parent.context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.06f)
-                textSize = 14f   // ✅ 12→14
-                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    0.06f
+                ).apply {
+                    // NO -> B/L 사이 여백
+                    marginEnd = dp(6)   // ✅ 오른쪽 여백만 둠
+                }
+                textSize = 14f
+                textAlignment = View.TEXT_ALIGNMENT_VIEW_START // ✅ 왼쪽 정렬
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                // 좌측 패딩 제거
+                setPadding(0, 0, 0, 0)
             }
 
-            // B/L (+2sp: 14)
+// B/L
             val tvBL = TextView(parent.context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.26f)
-                textSize = 14f   // ✅ 12→14
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    0.26f
+                )
+                textSize = 14f
                 maxLines = 1
+                // 필요하다면 살짝 시작 패딩 줄 수 있음
+                setPadding(0, 0, 0, 0)
             }
+
 
             // 차대번호(VIN만 굵게, +2sp: 14)
             val tvVin = TextView(parent.context).apply {
@@ -103,7 +121,7 @@ class ShippingRowAdapter(
 
             // 면장 (X=붉은색)
             val tvClear = TextView(parent.context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.14f)
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.06f)
                 gravity = Gravity.END
                 textSize = 12f
                 maxLines = 1
@@ -111,7 +129,7 @@ class ShippingRowAdapter(
 
             // 확인 영역(헤더와 동일 너비 0.10) — 버튼 컨테이너
             val boxCheck = LinearLayout(parent.context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.10f)
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.14f)
                 gravity = Gravity.END or Gravity.CENTER_VERTICAL
             }
             val btnCheck = Button(parent.context).apply {
@@ -130,7 +148,7 @@ class ShippingRowAdapter(
 
             // 선적 영역(헤더와 동일 너비 0.10) — 버튼 컨테이너
             val boxShip = LinearLayout(parent.context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.10f)
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.14f)
                 gravity = Gravity.END or Gravity.CENTER_VERTICAL
             }
             val btnShip = Button(parent.context).apply {

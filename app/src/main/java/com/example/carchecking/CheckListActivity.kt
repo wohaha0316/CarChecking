@@ -136,17 +136,19 @@ class CheckListActivity : AppCompatActivity() {
     }
 
     // ★ 체크/해제 시 DB 이벤트 기록
-    private fun onRowToggled(position: Int, nowChecked: Boolean) {
+    fun onRowToggled(position: Int, nowChecked: Boolean) {
         val user = getSharedPreferences("user_profile", MODE_PRIVATE).getString("checker_name", null)
         lifecycleScope.launch {
             eventRepo.logCheck(
                 fileKey = keyId,
-                rowIndex = position, // 화면 인덱스 기준(라벨 포함). 필요시 라벨 제외 인덱스로 변환 가능.
+                rowIndex = position, // 라벨 포함 화면 인덱스 기준
                 checked = nowChecked,
                 user = user
             )
+            updateStatus() // ✅ 즉시 갱신
         }
     }
+
 
     override fun onResume() { super.onResume(); if (this::adapter.isInitialized) updateStatus() }
     override fun onPause() { super.onPause(); saveCheckState() }
@@ -200,17 +202,20 @@ class CheckListActivity : AppCompatActivity() {
             .joinToString("\n")
     }
 
-    private fun formatStatusHtml(total: Int, clearanceX: Int, checked: Int) =
+    private fun formatStatusHtml(total: Int, clearanceX: Int, checked: Int, shipped: Int) =
         "전체 <font color='#000000'>${total} 대</font>  " +
-                "면장X <font color='#FF0000'>${clearanceX} 대</font>  " +
-                "확인 <font color='#0000FF'>${checked} 대</font>"
+                "면장X <font color='#CC0000'>${clearanceX} 대</font>  " +
+                "확인 <font color='#1E90FF'>${checked} 대</font>  " +
+                "선적 <font color='#008000'>${shipped} 대</font>"
+
 
     fun updateStatus() {
-        val totalCars = rows.count { !it.isLabelRow && it.bl.isNotBlank() } // B/L 개수 = 총대수
+        val totalCars = rows.count { !it.isLabelRow && it.bl.isNotBlank() }
         val clearanceX = rows.filter { !it.isLabelRow }.count { it.clearance.equals("X", true) }
         val checked = rows.count { it.isChecked }
+        val shipped = rows.indices.count { !rows[it].isLabelRow && readShipState(it) }
 
-        val statusHtml = formatStatusHtml(totalCars, clearanceX, checked)
+        val statusHtml = formatStatusHtml(totalCars, clearanceX, checked, shipped)
         tvStatus.text = fromHtmlCompat(statusHtml)
 
         val p = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
@@ -218,17 +223,15 @@ class CheckListActivity : AppCompatActivity() {
         p.putInt("$baseNew:total", totalCars)
         p.putInt("$baseNew:clearanceX", clearanceX)
         p.putInt("$baseNew:checked", checked)
+        p.putInt("$baseNew:shipped", shipped)
         p.putString("$baseNew:html", statusHtml)
         p.apply()
-
-        val legacy = getSharedPreferences("checklist_status", MODE_PRIVATE).edit()
-        val legacyBase = currentFile.absolutePath
-        legacy.putInt("$legacyBase|total", totalCars)
-        legacy.putInt("$legacyBase|clearanceX", clearanceX)
-        legacy.putInt("$legacyBase|checked", checked)
-        legacy.putString("$legacyBase|html", statusHtml)
-        legacy.apply()
     }
+
+    private fun readShipState(idx: Int): Boolean =
+        getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+            .getBoolean("ship_orders:${keyId}:${idx}_shipped", false)
+
 
     private fun saveCheckState() {
         val e = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()

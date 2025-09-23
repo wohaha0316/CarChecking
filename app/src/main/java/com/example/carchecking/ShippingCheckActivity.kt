@@ -141,16 +141,21 @@ class ShippingCheckActivity : AppCompatActivity() {
             updateStatus()
             true to ord
         } else {
+            // 해제 분기
             val removedOrder = readShipOrder(idx)
             clearShipState(idx)
             renumberAfterRemoval(removedOrder)
             decrementCounter()
-            safeNotifyItemChanged(idx)
+            safeNotifyDataChanged()   // ✅ 전체 새로고침으로 버튼 안 순번들이 당겨짐
             updateStatus()
             false to 0
         }
     }
 
+    private fun safeNotifyDataChanged() {
+        val doNotify = { (rv.adapter as? ShippingRowAdapter)?.notifyDataSetChanged() }
+        if (rv.isComputingLayout || rv.isLayoutRequested) rv.post { doNotify() } else doNotify()
+    }
     private fun safeNotifyItemChanged(idx: Int) {
         val doNotify = { (rv.adapter as? ShippingRowAdapter)?.notifyItemChanged(idx) }
         if (rv.isComputingLayout || rv.isLayoutRequested) rv.post { doNotify() } else doNotify()
