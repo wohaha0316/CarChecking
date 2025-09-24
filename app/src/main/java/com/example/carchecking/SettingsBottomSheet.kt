@@ -2,7 +2,12 @@ package com.example.carchecking
 
 import android.content.Context
 import android.view.LayoutInflater
-import android.widget.*
+import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.SeekBar
+import android.widget.Switch
+import android.widget.TextView
 import com.google.android.material.bottomsheet.BottomSheetDialog
 
 class SettingsBottomSheet(
@@ -16,7 +21,20 @@ class SettingsBottomSheet(
     private var cfg = initial.copy()
     private var scope: UiPrefs.Scope = UiPrefs.Scope.FILE
 
-    private fun setupSeek(v: android.view.View, idSeek: Int, idText: Int, label: String, min: Int, max: Int, get: () -> Int, set: (Int) -> Unit) {
+    // ▼▼ 접기/펼치기 뷰를 프로퍼티로 선언 (스코프 문제 방지)
+    private var headerWidths: LinearLayout? = null
+    private var groupWidths: LinearLayout? = null
+    private var icWidths: TextView? = null
+
+    private var headerFonts: LinearLayout? = null
+    private var groupFonts: LinearLayout? = null
+    private var icFonts: TextView? = null
+
+    // ---- 공용 유틸 ----
+    private fun setupSeek(
+        v: View, idSeek: Int, idText: Int, label: String,
+        min: Int, max: Int, get: () -> Int, set: (Int) -> Unit
+    ) {
         val sb = v.findViewById<SeekBar>(idSeek)
         val tv = v.findViewById<TextView>(idText)
         sb.max = max - min
@@ -34,7 +52,10 @@ class SettingsBottomSheet(
         })
     }
 
-    private fun setupWeight(v: android.view.View, idSeek: Int, idText: Int, label: String, get: () -> Float, set: (Float) -> Unit) {
+    private fun setupWeight(
+        v: View, idSeek: Int, idText: Int, label: String,
+        get: () -> Float, set: (Float) -> Unit
+    ) {
         val sb = v.findViewById<SeekBar>(idSeek)
         val tv = v.findViewById<TextView>(idText)
         val min = 4
@@ -55,7 +76,7 @@ class SettingsBottomSheet(
         })
     }
 
-    private fun setupRowSpacing(v: android.view.View) {
+    private fun setupRowSpacing(v: View) {
         val sb = v.findViewById<SeekBar>(R.id.sbRowSpacing)
         val tv = v.findViewById<TextView>(R.id.tvRowSpacing)
         // 0.10 ~ 0.80 (계수) → 10% ~ 80% 표시
@@ -77,55 +98,82 @@ class SettingsBottomSheet(
         })
     }
 
-    private fun refreshAllControls(v: android.view.View) {
+    private fun refreshAllControls(v: View) {
         // weight
-        v.findViewById<SeekBar>(R.id.sbWNo)?.progress = ((cfg.wNo * 100).toInt() - 4).coerceIn(0, 66)
-        v.findViewById<TextView>(R.id.tvWNo)?.text = "No 폭 ${(cfg.wNo * 100).toInt()}%"
-        v.findViewById<SeekBar>(R.id.sbWBL)?.progress = ((cfg.wBL * 100).toInt() - 4).coerceIn(0, 66)
-        v.findViewById<TextView>(R.id.tvWBL)?.text = "B/L 폭 ${(cfg.wBL * 100).toInt()}%"
-        v.findViewById<SeekBar>(R.id.sbWHaju)?.progress = ((cfg.wHaju * 100).toInt() - 4).coerceIn(0, 66)
-        v.findViewById<TextView>(R.id.tvWHaju)?.text = "화주 폭 ${(cfg.wHaju * 100).toInt()}%"
-        v.findViewById<SeekBar>(R.id.sbWCar)?.progress = ((cfg.wCar * 100).toInt() - 4).coerceIn(0, 66)
-        v.findViewById<TextView>(R.id.tvWCar)?.text = "차량정보 폭 ${(cfg.wCar * 100).toInt()}%"
-        v.findViewById<SeekBar>(R.id.sbWQty)?.progress = ((cfg.wQty * 100).toInt() - 4).coerceIn(0, 66)
-        v.findViewById<TextView>(R.id.tvWQty)?.text = "수(Qty) 폭 ${(cfg.wQty * 100).toInt()}%"
+        v.findViewById<SeekBar>(R.id.sbWNo)?.progress    = ((cfg.wNo    * 100).toInt() - 4).coerceIn(0, 66)
+        v.findViewById<TextView>(R.id.tvWNo)?.text       = "No 폭 ${(cfg.wNo * 100).toInt()}%"
+        v.findViewById<SeekBar>(R.id.sbWBL)?.progress    = ((cfg.wBL    * 100).toInt() - 4).coerceIn(0, 66)
+        v.findViewById<TextView>(R.id.tvWBL)?.text       = "B/L 폭 ${(cfg.wBL * 100).toInt()}%"
+        v.findViewById<SeekBar>(R.id.sbWHaju)?.progress  = ((cfg.wHaju  * 100).toInt() - 4).coerceIn(0, 66)
+        v.findViewById<TextView>(R.id.tvWHaju)?.text     = "화주 폭 ${(cfg.wHaju * 100).toInt()}%"
+        v.findViewById<SeekBar>(R.id.sbWCar)?.progress   = ((cfg.wCar   * 100).toInt() - 4).coerceIn(0, 66)
+        v.findViewById<TextView>(R.id.tvWCar)?.text      = "차량정보 폭 ${(cfg.wCar * 100).toInt()}%"
+        v.findViewById<SeekBar>(R.id.sbWQty)?.progress   = ((cfg.wQty   * 100).toInt() - 4).coerceIn(0, 66)
+        v.findViewById<TextView>(R.id.tvWQty)?.text      = "수(Qty) 폭 ${(cfg.wQty * 100).toInt()}%"
         v.findViewById<SeekBar>(R.id.sbWClear)?.progress = ((cfg.wClear * 100).toInt() - 4).coerceIn(0, 66)
-        v.findViewById<TextView>(R.id.tvWClear)?.text = "면장 폭 ${(cfg.wClear * 100).toInt()}%"
+        v.findViewById<TextView>(R.id.tvWClear)?.text    = "면장 폭 ${(cfg.wClear * 100).toInt()}%"
         v.findViewById<SeekBar>(R.id.sbWCheck)?.progress = ((cfg.wCheck * 100).toInt() - 4).coerceIn(0, 66)
-        v.findViewById<TextView>(R.id.tvWCheck)?.text = "확인 폭 ${(cfg.wCheck * 100).toInt()}%"
+        v.findViewById<TextView>(R.id.tvWCheck)?.text    = "확인 폭 ${(cfg.wCheck * 100).toInt()}%"
 
         // font
-        v.findViewById<SeekBar>(R.id.sbFNo)?.progress = (cfg.fNo.toInt() - 8).coerceIn(0, 12)
-        v.findViewById<TextView>(R.id.tvFNo)?.text = "No 글자 ${cfg.fNo.toInt()}"
-        v.findViewById<SeekBar>(R.id.sbFBL)?.progress = (cfg.fBL.toInt() - 9).coerceIn(0, 13)
-        v.findViewById<TextView>(R.id.tvFBL)?.text = "B/L 글자 ${cfg.fBL.toInt()}"
-        v.findViewById<SeekBar>(R.id.sbFHaju)?.progress = (cfg.fHaju.toInt() - 9).coerceIn(0, 13)
-        v.findViewById<TextView>(R.id.tvFHaju)?.text = "화주 글자 ${cfg.fHaju.toInt()}"
-        v.findViewById<SeekBar>(R.id.sbFCar)?.progress = (cfg.fCar.toInt() - 9).coerceIn(0, 13)
-        v.findViewById<TextView>(R.id.tvFCar)?.text = "차량정보 글자 ${cfg.fCar.toInt()}"
-        v.findViewById<SeekBar>(R.id.sbFQty)?.progress = (cfg.fQty.toInt() - 8).coerceIn(0, 12)
-        v.findViewById<TextView>(R.id.tvFQty)?.text = "수(Qty) 글자 ${cfg.fQty.toInt()}"
-        v.findViewById<SeekBar>(R.id.sbFClear)?.progress = (cfg.fClear.toInt() - 8).coerceIn(0, 12)
-        v.findViewById<TextView>(R.id.tvFClear)?.text = "면장 글자 ${cfg.fClear.toInt()}"
-        v.findViewById<SeekBar>(R.id.sbFCheck)?.progress = (cfg.fCheck.toInt() - 8).coerceIn(0, 12)
-        v.findViewById<TextView>(R.id.tvFCheck)?.text = "확인 글자 ${cfg.fCheck.toInt()}"
+        fun f(vf: Float) = vf.toInt()
+        v.findViewById<SeekBar>(R.id.sbFNo)?.progress    = (f(cfg.fNo)   - 8).coerceIn(0, 12)
+        v.findViewById<TextView>(R.id.tvFNo)?.text       = "No 글자 ${f(cfg.fNo)}"
+        v.findViewById<SeekBar>(R.id.sbFBL)?.progress    = (f(cfg.fBL)   - 9).coerceIn(0, 13)
+        v.findViewById<TextView>(R.id.tvFBL)?.text       = "B/L 글자 ${f(cfg.fBL)}"
+        v.findViewById<SeekBar>(R.id.sbFHaju)?.progress  = (f(cfg.fHaju) - 9).coerceIn(0, 13)
+        v.findViewById<TextView>(R.id.tvFHaju)?.text     = "화주 글자 ${f(cfg.fHaju)}"
+        v.findViewById<SeekBar>(R.id.sbFCar)?.progress   = (f(cfg.fCar)  - 9).coerceIn(0, 13)
+        v.findViewById<TextView>(R.id.tvFCar)?.text      = "차량정보 글자 ${f(cfg.fCar)}"
+        v.findViewById<SeekBar>(R.id.sbFQty)?.progress   = (f(cfg.fQty)  - 8).coerceIn(0, 12)
+        v.findViewById<TextView>(R.id.tvFQty)?.text      = "수(Qty) 글자 ${f(cfg.fQty)}"
+        v.findViewById<SeekBar>(R.id.sbFClear)?.progress = (f(cfg.fClear)- 8).coerceIn(0, 12)
+        v.findViewById<TextView>(R.id.tvFClear)?.text    = "면장 글자 ${f(cfg.fClear)}"
+        v.findViewById<SeekBar>(R.id.sbFCheck)?.progress = (f(cfg.fCheck)- 8).coerceIn(0, 12)
+        v.findViewById<TextView>(R.id.tvFCheck)?.text    = "확인 글자 ${f(cfg.fCheck)}"
 
         // wrap / vin
-        v.findViewById<Switch>(R.id.swWrapBL)?.isChecked = cfg.wrapBL
+        v.findViewById<Switch>(R.id.swWrapBL)?.isChecked   = cfg.wrapBL
         v.findViewById<Switch>(R.id.swWrapHaju)?.isChecked = cfg.wrapHaju
-        v.findViewById<Switch>(R.id.swVinBold)?.isChecked = cfg.vinBold
+        v.findViewById<Switch>(R.id.swVinBold)?.isChecked  = cfg.vinBold
 
         // row spacing
-        v.findViewById<SeekBar>(R.id.sbRowSpacing)?.progress = (((cfg.rowSpacing - 0.10f) * 100).toInt()).coerceIn(0, 70)
-        v.findViewById<TextView>(R.id.tvRowSpacing)?.text = "행간 ${(cfg.rowSpacing * 100).toInt()}%"
+        v.findViewById<SeekBar>(R.id.sbRowSpacing)?.progress =
+            (((cfg.rowSpacing - 0.10f) * 100).toInt()).coerceIn(0, 70)
+        v.findViewById<TextView>(R.id.tvRowSpacing)?.text =
+            "행간 ${(cfg.rowSpacing * 100).toInt()}%"
 
         // divider
         v.findViewById<Switch>(R.id.swRowDivider)?.isChecked = cfg.showRowDividers
     }
 
+    // 접기/펼치기 토글 함수 (프로퍼티 사용)
+    private fun toggle(g: LinearLayout?, ic: TextView?) {
+        if (g == null || ic == null) return
+        g.visibility = if (g.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        ic.text = if (g.visibility == View.VISIBLE) "▲" else "▼"
+    }
+
     init {
         val v = LayoutInflater.from(context).inflate(R.layout.bottom_sheet_settings, null)
         setContentView(v)
+
+        // ▼▼ 접기/펼치기 뷰 바인딩 (프로퍼티에 저장)
+        headerWidths = v.findViewById(R.id.headerWidths)
+        groupWidths  = v.findViewById(R.id.groupWidths)
+        icWidths     = v.findViewById(R.id.icWidths)
+
+        headerFonts  = v.findViewById(R.id.headerFonts)
+        groupFonts   = v.findViewById(R.id.groupFonts)
+        icFonts      = v.findViewById(R.id.icFonts)
+
+        headerWidths?.setOnClickListener { toggle(groupWidths, icWidths) }
+        headerFonts?.setOnClickListener  { toggle(groupFonts, icFonts)  }
+
+        // 기본 접힘
+        groupWidths?.visibility = View.GONE; icWidths?.text = "▼"
+        groupFonts?.visibility  = View.GONE; icFonts?.text  = "▼"
+        // ▲▲ 여기까지가 접기/펼치기
 
         // 저장 범위
         val swScope = v.findViewById<Switch>(R.id.swScope)
@@ -135,23 +183,23 @@ class SettingsBottomSheet(
         }
 
         // ---- 열 너비 ----
-        setupWeight(v, R.id.sbWNo, R.id.tvWNo, "No 폭", { cfg.wNo }, { cfg.wNo = it })
-        setupWeight(v, R.id.sbWBL, R.id.tvWBL, "B/L 폭", { cfg.wBL }, { cfg.wBL = it })
-        setupWeight(v, R.id.sbWHaju, R.id.tvWHaju, "화주 폭", { cfg.wHaju }, { cfg.wHaju = it })
-        setupWeight(v, R.id.sbWCar, R.id.tvWCar, "차량정보 폭", { cfg.wCar }, { cfg.wCar = it })
-        setupWeight(v, R.id.sbWQty, R.id.tvWQty, "수(Qty) 폭", { cfg.wQty }, { cfg.wQty = it })
-        setupWeight(v, R.id.sbWClear, R.id.tvWClear, "면장 폭", { cfg.wClear }, { cfg.wClear = it })
-        setupWeight(v, R.id.sbWCheck, R.id.tvWCheck, "확인 폭", { cfg.wCheck }, { cfg.wCheck = it })
+        setupWeight(v, R.id.sbWNo,    R.id.tvWNo,    "No 폭",       { cfg.wNo },    { cfg.wNo = it })
+        setupWeight(v, R.id.sbWBL,    R.id.tvWBL,    "B/L 폭",      { cfg.wBL },    { cfg.wBL = it })
+        setupWeight(v, R.id.sbWHaju,  R.id.tvWHaju,  "화주 폭",     { cfg.wHaju },  { cfg.wHaju = it })
+        setupWeight(v, R.id.sbWCar,   R.id.tvWCar,   "차량정보 폭", { cfg.wCar },   { cfg.wCar = it })
+        setupWeight(v, R.id.sbWQty,   R.id.tvWQty,   "수(Qty) 폭",  { cfg.wQty },   { cfg.wQty = it })
+        setupWeight(v, R.id.sbWClear, R.id.tvWClear, "면장 폭",     { cfg.wClear }, { cfg.wClear = it })
+        setupWeight(v, R.id.sbWCheck, R.id.tvWCheck, "확인 폭",     { cfg.wCheck }, { cfg.wCheck = it })
 
         // ---- 글자 크기 (sp) ----
         fun f(vf: Float) = vf.toInt()
-        setupSeek(v, R.id.sbFNo, R.id.tvFNo, "No 글자", 8, 20, { f(cfg.fNo) }, { cfg.fNo = it.toFloat() })
-        setupSeek(v, R.id.sbFBL, R.id.tvFBL, "B/L 글자", 8, 26, { f(cfg.fBL) }, { cfg.fBL = it.toFloat() })
-        setupSeek(v, R.id.sbFHaju, R.id.tvFHaju, "화주 글자", 8, 26, { f(cfg.fHaju) }, { cfg.fHaju = it.toFloat() })
-        setupSeek(v, R.id.sbFCar, R.id.tvFCar, "차량정보 글자", 8, 26, { f(cfg.fCar) }, { cfg.fCar = it.toFloat() })
-        setupSeek(v, R.id.sbFQty, R.id.tvFQty, "수(Qty) 글자", 8, 22, { f(cfg.fQty) }, { cfg.fQty = it.toFloat() })
-        setupSeek(v, R.id.sbFClear, R.id.tvFClear, "면장 글자", 8, 22, { f(cfg.fClear) }, { cfg.fClear = it.toFloat() })
-        setupSeek(v, R.id.sbFCheck, R.id.tvFCheck, "확인 글자", 8, 22, { f(cfg.fCheck) }, { cfg.fCheck = it.toFloat() })
+        setupSeek(v, R.id.sbFNo,    R.id.tvFNo,    "No 글자",       8, 20, { f(cfg.fNo) },    { cfg.fNo    = it.toFloat() })
+        setupSeek(v, R.id.sbFBL,    R.id.tvFBL,    "B/L 글자",      8, 26, { f(cfg.fBL) },    { cfg.fBL    = it.toFloat() })
+        setupSeek(v, R.id.sbFHaju,  R.id.tvFHaju,  "화주 글자",     8, 26, { f(cfg.fHaju) },  { cfg.fHaju  = it.toFloat() })
+        setupSeek(v, R.id.sbFCar,   R.id.tvFCar,   "차량정보 글자", 8, 26, { f(cfg.fCar) },   { cfg.fCar   = it.toFloat() })
+        setupSeek(v, R.id.sbFQty,   R.id.tvFQty,   "수(Qty) 글자",  8, 22, { f(cfg.fQty) },   { cfg.fQty   = it.toFloat() })
+        setupSeek(v, R.id.sbFClear, R.id.tvFClear, "면장 글자",     8, 22, { f(cfg.fClear) }, { cfg.fClear = it.toFloat() })
+        setupSeek(v, R.id.sbFCheck, R.id.tvFCheck, "확인 글자",     8, 22, { f(cfg.fCheck) }, { cfg.fCheck = it.toFloat() })
 
         // ---- 줄바꿈/스타일 ----
         val swWrapBL = v.findViewById<Switch>(R.id.swWrapBL)
@@ -177,7 +225,7 @@ class SettingsBottomSheet(
         // ---- 하단 버튼 ----
         v.findViewById<Button>(R.id.btnReset)?.setOnClickListener {
             cfg = UiConfig.defaults()
-            refreshAllControls(v)
+            refreshAllControls(v)   // 접힘 유지 + 값만 업데이트
             onResetToDefault(cfg)   // 미리보기 즉시 반영
         }
         v.findViewById<Button>(R.id.btnApply)?.setOnClickListener {
