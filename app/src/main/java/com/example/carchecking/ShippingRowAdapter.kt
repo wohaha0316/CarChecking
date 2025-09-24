@@ -122,9 +122,10 @@ class ShippingRowAdapter(
             // 면장 (X=붉은색)
             val tvClear = TextView(parent.context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.06f)
-                gravity = Gravity.END
                 textSize = 12f
                 maxLines = 1
+                gravity = Gravity.CENTER                      // ← END ➜ CENTER
+                textAlignment = View.TEXT_ALIGNMENT_CENTER    // ← 추가
             }
 
             // 확인 영역(헤더와 동일 너비 0.10) — 버튼 컨테이너
@@ -135,15 +136,22 @@ class ShippingRowAdapter(
             val btnCheck = Button(parent.context).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
-                    dp(32)
+                    dp(32)                 // ← 버튼 높이 유지
                 )
                 minWidth = dp(56)
-                textSize = 12f
+                textSize = 14f
                 isAllCaps = false
+
+                // ▼ 추가: 안쪽 패딩/정렬만으로 글자 잘림 방지
+                includeFontPadding = false         // 폰트 여백 제거 (시각적 클립 방지에 유리)
+                gravity = Gravity.CENTER           // 수직/수평 중앙 배치
+                setPadding(dp(10), dp(6), dp(10), dp(6))  // 좌우10dp, 상하6dp
+
                 // 색은 파란 "텍스트" 요구 — 배경은 연회색 유지
                 setBackgroundColor(CHIP_GREY)
                 setTextColor(COLOR_BLUE)
             }
+
             boxCheck.addView(btnCheck)
 
             // 선적 영역(헤더와 동일 너비 0.10) — 버튼 컨테이너
@@ -154,12 +162,18 @@ class ShippingRowAdapter(
             val btnShip = Button(parent.context).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,  // 컨테이너 내에서 꽉 차게
-                    dp(32)
+                    dp(32)                                // 높이는 고정
                 )
                 minWidth = dp(56)
-                textSize = 12f
+                textSize = 14f
                 isAllCaps = false
+
+                // ✅ 추가: 글자 잘림 방지용 세팅
+                includeFontPadding = false
+                gravity = Gravity.CENTER
+                setPadding(dp(10), dp(6), dp(10), dp(6))  // 좌우 10dp, 상하 6dp
             }
+
             boxShip.addView(btnShip)
 
             row.addView(tvNo)

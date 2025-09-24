@@ -53,11 +53,6 @@ class MainActivity : AppCompatActivity() {
         renderSavedFiles()
     }
 
-    override fun onResume() {
-        super.onResume()
-        renderSavedFiles()
-    }
-
     private fun renderSavedFiles() {
         fileListLayout.removeAllViews()
 
@@ -115,6 +110,38 @@ class MainActivity : AppCompatActivity() {
                 try {
                     if (file.exists()) file.delete()
                     UploadedExcelStore.files.removeAll { it.absolutePath == file.absolutePath }
+
+                    // ✅ 여기 추가: 이 파일의 keyId/레거시 경로에 해당하는 모든 상태/카운터 삭제
+                    val keyIdDel = ParsedCache.keyFor(file).id()
+                    val pNew = getSharedPreferences("carchecking_prefs", Context.MODE_PRIVATE)
+                    val pOld = getSharedPreferences("checklist_status", Context.MODE_PRIVATE)
+
+                    // 새 포맷 키들 제거 (status:/check_orders:/ship_orders:)
+                    run {
+                        val e = pNew.edit()
+                        for (k in pNew.all.keys) {
+                            if (k.startsWith("status:$keyIdDel:") ||
+                                k.startsWith("check_orders:$keyIdDel:") ||
+                                k.startsWith("ship_orders:$keyIdDel:")) {
+                                e.remove(k)
+                            }
+                        }
+                        // 카운터 제거
+                        e.remove("check_orders:$keyIdDel:orderCounter")
+                        e.remove("ship_orders:$keyIdDel:orderCounter")
+                        e.apply()
+                    }
+
+                    // 구버전 키 제거 ("<absolutePath>|" 프리픽스)
+                    run {
+                        val e = pOld.edit()
+                        val prefix = file.absolutePath + "|"
+                        for (k in pOld.all.keys) {
+                            if (k.startsWith(prefix)) e.remove(k)
+                        }
+                        e.apply()
+                    }
+
                     renderSavedFiles()
                     Toast.makeText(this@MainActivity, "삭제 완료", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
@@ -123,6 +150,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
 
         topRow.addView(fileBtn)
         topRow.addView(logBtn)
@@ -143,7 +171,8 @@ class MainActivity : AppCompatActivity() {
         val prefsOld = getSharedPreferences("checklist_status", Context.MODE_PRIVATE)
         val keyId = ParsedCache.keyFor(file).id()
 
-        val statusHtml = prefsNew.getString("status:$keyId:html", null)
+// statusHtml 로드 (기존)
+        var statusHtml = prefsNew.getString("status:$keyId:html", null)
             ?: prefsOld.getString("${file.absolutePath}|html", null)
             ?: run {
                 val total = prefsNew.getInt("status:$keyId:total",
@@ -152,10 +181,25 @@ class MainActivity : AppCompatActivity() {
                     prefsOld.getInt("${file.absolutePath}|clearanceX", 0))
                 val checked = prefsNew.getInt("status:$keyId:checked",
                     prefsOld.getInt("${file.absolutePath}|checked", 0))
+                // ✅ 업로드 직후에도 '선적 0 대'를 기본으로 포함
                 "전체 <font color='#000000'>${total} 대</font>  " +
-                        "면장X <font color='#FF0000'>${clearanceX} 대</font>  " +
-                        "확인 <font color='#1E90FF'>${checked} 대</font>"
+                        "면장X <font color='#CC0000'>${clearanceX} 대</font>  " +
+                        "확인 <font color='#1E90FF'>${checked} 대</font>  " +
+                        "선적 <font color='#008000'>0 대</font>"
             }
+
+// ✅ normalize: 누락된 '선적' 세그먼트 보강 + 색상 통일
+        if (statusHtml != null) {
+            if (!statusHtml!!.contains("선적")) {
+                statusHtml = statusHtml + "  선적 <font color='#008000'>0 대</font>"
+            }
+            statusHtml = statusHtml!!
+                .replace("#FF0000", "#CC0000") // 빨강 통일
+                .replace("#ff0000", "#CC0000")
+                .replace("#1e90ff", "#1E90FF") // 파랑 케이스 통일
+        }
+
+
 
         val statusBtn = Button(this).apply {
             text = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N)
@@ -170,6 +214,8 @@ class MainActivity : AppCompatActivity() {
             isAllCaps = false
             isSingleLine = true
             ellipsize = TextUtils.TruncateAt.END
+            textSize = 16f                                    // ✅ +2pt
+            typeface = android.graphics.Typeface.DEFAULT_BOLD // ✅ 굵게
             setOnClickListener { /* 클릭 없음 */ }
         }
         bottomRow.addView(statusBtn)
@@ -247,5 +293,9 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "열 수 있는 엑셀 앱이 없습니다", Toast.LENGTH_SHORT).show()
         }
+    }
+    override fun onResume() {
+        super.onResume()
+        renderSavedFiles()  // ✅ 돌아올 때 현황 버튼/리스트 다시 그리기
     }
 }

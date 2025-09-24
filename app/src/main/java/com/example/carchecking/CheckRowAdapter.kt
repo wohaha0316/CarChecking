@@ -102,10 +102,11 @@ class CheckRowAdapter(
                 tvTight(this, ui.fNo)
                 isSingleLine = true; maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, 0, 0, 0)                           // ◀ 좌측 패딩 0
-                textAlignment = View.TEXT_ALIGNMENT_VIEW_START   // ◀ 왼쪽 정렬
+                // 정렬 그대로 유지
+                textAlignment = View.TEXT_ALIGNMENT_VIEW_START
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                setTextColor(Color.DKGRAY)
+                // ◀ 왼쪽 패딩 2dp 적용 (나머지는 0)
+                setPadding(dp(this, 4f), 0, 0, 0)
             }
             val bl = TextView(parent.context).apply {
                 layoutParams = if (ui.wrapBL) lpTop(ui.wBL) else lpCenter(ui.wBL)
@@ -127,8 +128,10 @@ class CheckRowAdapter(
                 layoutParams = lpTop(ui.wCar)
                 tvTight(this, ui.fCar)
                 isSingleLine = false; maxLines = Int.MAX_VALUE; ellipsize = null
-                setPadding(0, 0, dp(this, 2f), 0)   // ◀ 오른쪽 패딩만 2dp
+                // ▶ 오른쪽 패딩 0으로
+                setPadding(0, 0, 0, 0)
             }
+
             val qty = TextView(parent.context).apply {
                 layoutParams = lpCenter(ui.wQty)
                 tvTight(this, ui.fQty)
@@ -138,8 +141,17 @@ class CheckRowAdapter(
             val clearance = TextView(parent.context).apply {
                 layoutParams = lpCenter(ui.wClear)
                 tvTight(this, ui.fClear)
-                isSingleLine = true; maxLines = 1; gravity = Gravity.CENTER
+                isSingleLine = true
+                maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
+
+                // ✅ 중앙정렬
+                gravity = Gravity.CENTER
+                textAlignment = View.TEXT_ALIGNMENT_CENTER
+
+                // ✅ 굵게 + 빨간색 (현황판과 동일 #CC0000)
+                setTextColor(Color.parseColor("#CC0000"))
+                typeface = Typeface.DEFAULT_BOLD
             }
             val checkBtn = Button(parent.context).apply {
                 layoutParams = lpCenter(ui.wCheck)

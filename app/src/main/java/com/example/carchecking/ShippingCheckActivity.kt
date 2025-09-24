@@ -64,23 +64,40 @@ class ShippingCheckActivity : AppCompatActivity() {
     // ===== 현황판 =====
     private fun updateStatus() {
         val total = rows.count { !it.isLabelRow }
-        val noClearCount = rows.indices.count { !rows[it].isLabelRow && isClearanceX(rows[it].clearance) }
+        val clearanceX = rows.indices.count { !rows[it].isLabelRow && isClearanceX(rows[it].clearance) }
         val checked = rows.indices.count { !rows[it].isLabelRow && readCheckedState(it) }
         val shipped = rows.indices.count { !rows[it].isLabelRow && readShipState(it) }
 
-        val html = "전체 <b>${pad2(total)}대</b>  " +
-                "<font color='#CC0000'>면장X <b>${pad2(noClearCount)}대</b></font>  " +  // ✅ 붉은색
-                "<font color='#1E90FF'>확인 <b>${pad2(checked)}대</b></font>  " +
-                "<font color='#008000'>선적 <b>${pad2(shipped)}대</b></font>"
+        val html = "전체 <font color='#000000'>${String.format("%02d", total)}대</font>  " +
+                "<font color='#CC0000'>면장X <b>${String.format("%02d", clearanceX)}대</b></font>  " +
+                "<font color='#1E90FF'>확인 <b>${String.format("%02d", checked)}대</b></font>  " +
+                "<font color='#008000'>선적 <b>${String.format("%02d", shipped)}대</b></font>"
 
-        tvStatus.text = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N)
-            Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY)
-        else Html.fromHtml(html)
+        // 화면 표시
+        tvStatus.text = fromHtmlCompat(html)
         tvStatus.gravity = Gravity.CENTER_HORIZONTAL
+
+        // ✅ 메인에서 읽을 수 있도록 저장 (차체크 화면과 동일 키)
+        val e = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
+        val base = "status:$keyId"
+        e.putInt("$base:total", total)
+        e.putInt("$base:clearanceX", clearanceX)
+        e.putInt("$base:checked", checked)
+        e.putInt("$base:shipped", shipped)
+        e.putString("$base:html", html)
+        e.apply()
     }
 
+    private fun fromHtmlCompat(s: String) =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N)
+            android.text.Html.fromHtml(s, android.text.Html.FROM_HTML_MODE_LEGACY)
+        else android.text.Html.fromHtml(s)
     private fun pad2(v: Int) = String.format(Locale.US, "%02d", v)
 
+    override fun onPause() {
+        super.onPause()
+        updateStatus()   // ✅ 나갈 때 최종 저장
+    }
     private fun isClearanceX(c: String): Boolean {
         val t = c.trim().lowercase(Locale.ROOT)
         return t in setOf("x","미통관","n","0","x표시","면장x","미처리","미")
