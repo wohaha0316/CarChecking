@@ -105,7 +105,10 @@ class MainActivity : AppCompatActivity() {
             text = "로그"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.2f)
             setOnClickListener {
-                startActivity(Intent(this@MainActivity, LogActivity::class.java))
+                val intent = Intent(this@MainActivity, LogActivity::class.java)
+                // 현재 addFileRow 파라미터로 받은 file 객체 → file.name 전달
+                intent.putExtra(LogActivity.EXTRA_EXCEL_NAME, file.name)
+                startActivity(intent)
             }
         }
 

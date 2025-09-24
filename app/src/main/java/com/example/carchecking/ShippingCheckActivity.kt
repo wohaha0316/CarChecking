@@ -155,47 +155,37 @@ class ShippingCheckActivity : AppCompatActivity() {
     }
 
     // 클릭에서만 호출: 안전 갱신(post)로 레이아웃 중 notify 방지
+    // ShippingCheckActivity.kt 내부
+    /** 선적 토글: (idx)행의 선적 여부를 뒤집고, 순번/현황/로그를 일관되게 처리한다. */
     private fun toggleShip(idx: Int): Pair<Boolean, Int> {
-        if (rows.getOrNull(idx)?.isLabelRow == true) return false to 0
-        val cur = readShipState(idx)
-        return if (!cur) {
-            val ord = nextOrder()
-            saveShipState(idx, true, ord)
-            safeNotifyItemChanged(idx)
-            updateStatus()
+        val row = rows.getOrNull(idx) ?: return false to 0
+        if (row.isLabelRow == true) return false to 0
+
+        val wasShipped = readShipState(idx)        // 현재 선적 여부
+        val bl = row.bl                             // B/L 번호 (프로젝트 필드명 그대로)
+        val nthCheck = readCheckedOrder(idx)        // 확인 순번 (없으면 0을 리턴하도록 구현돼있어야 함)
+
+        return if (!wasShipped) {
+            // ===== 선적으로 전환 =====
+            val ord = nextOrder()                   // 새 선적 순번
+            saveShipState(idx, true, ord)           // 상태 저장(선적/순번)
+            LogBus.shipAction(bl, nthCheck, ord)    // ★ 로그: 선적
+
+            safeNotifyItemChanged(idx)              // 해당 아이템만 갱신
+            updateStatus()                          // 현황판 업데이트
             true to ord
         } else {
-            // 해제 분기
-            val removedOrder = readShipOrder(idx)
-            clearShipState(idx)
-            renumberAfterRemoval(removedOrder)
-            decrementCounter()
-            safeNotifyDataChanged()   // ✅ 전체 새로고침으로 버튼 안 순번들이 당겨짐
-            val bl = rows[idx].bl
-            val nthCheck = readCheckedOrder(idx)
+            // ===== 선적 취소 =====
+            val removedOrder = readShipOrder(idx)   // 지워질 순번을 먼저 읽어둔다
+            clearShipState(idx)                     // 선적 상태/순번 제거
+            renumberAfterRemoval(removedOrder)      // 뒤 번호 당겨오기
+            decrementCounter()                      // 총계 감소 등
 
-            return if (!cur) {
-                val ord = nextOrder()
-                saveShipState(idx, true, ord)
-                // ★ 로그: 선적
-                LogBus.shipAction(bl, nthCheck, ord)
-
-                safeNotifyItemChanged(idx)
-                updateStatus()
-                true to ord
-            } else {
-                val removedOrder = readShipOrder(idx)
-                clearShipState(idx)
-                renumberAfterRemoval(removedOrder)
-                decrementCounter()
-                // ★ 로그: 선적 취소 (removedOrder 사용)
-                if (removedOrder > 0) LogBus.shipActionCancel(bl, nthCheck, removedOrder)
-
-                safeNotifyDataChanged()
-                updateStatus()
-                false to 0
+            if (removedOrder > 0) {
+                LogBus.shipActionCancel(bl, nthCheck, removedOrder) // ★ 로그: 선적 취소
             }
 
+            safeNotifyDataChanged()                 // 전체 새로고침(당겨온 순번 반영)
             updateStatus()
             false to 0
         }
