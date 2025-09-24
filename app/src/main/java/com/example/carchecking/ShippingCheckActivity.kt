@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
 import java.util.Locale
+import com.example.carchecking.LogBus
 
 class ShippingCheckActivity : AppCompatActivity() {
 
@@ -94,7 +95,13 @@ class ShippingCheckActivity : AppCompatActivity() {
         else android.text.Html.fromHtml(s)
     private fun pad2(v: Int) = String.format(Locale.US, "%02d", v)
 
+    override fun onResume() {
+        super.onResume()
+        LogBus.appOpen("선적화면")
+    }
+
     override fun onPause() {
+        LogBus.appOpen("선적화면")
         super.onPause()
         updateStatus()   // ✅ 나갈 때 최종 저장
     }
@@ -164,6 +171,31 @@ class ShippingCheckActivity : AppCompatActivity() {
             renumberAfterRemoval(removedOrder)
             decrementCounter()
             safeNotifyDataChanged()   // ✅ 전체 새로고침으로 버튼 안 순번들이 당겨짐
+            val bl = rows[idx].bl
+            val nthCheck = readCheckedOrder(idx)
+
+            return if (!cur) {
+                val ord = nextOrder()
+                saveShipState(idx, true, ord)
+                // ★ 로그: 선적
+                LogBus.shipAction(bl, nthCheck, ord)
+
+                safeNotifyItemChanged(idx)
+                updateStatus()
+                true to ord
+            } else {
+                val removedOrder = readShipOrder(idx)
+                clearShipState(idx)
+                renumberAfterRemoval(removedOrder)
+                decrementCounter()
+                // ★ 로그: 선적 취소 (removedOrder 사용)
+                if (removedOrder > 0) LogBus.shipActionCancel(bl, nthCheck, removedOrder)
+
+                safeNotifyDataChanged()
+                updateStatus()
+                false to 0
+            }
+
             updateStatus()
             false to 0
         }

@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import java.io.File
+import com.example.carchecking.LogBus
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,6 +29,10 @@ class MainActivity : AppCompatActivity() {
             if (UploadedExcelStore.files.none { it.absolutePath == saved.absolutePath }) {
                 UploadedExcelStore.files.add(saved)
             }
+// (중략) UploadedExcelStore.files.add(saved)
+// (여기) 엑셀 업로드 로그
+            LogBus.excelUpload(saved.name)
+// renderSavedFiles()
             renderSavedFiles()
             Toast.makeText(this, "${saved.name} 업로드 완료", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
@@ -51,6 +56,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         renderSavedFiles()
+        LogBus.init(applicationContext)
     }
 
     private fun renderSavedFiles() {
@@ -99,7 +105,7 @@ class MainActivity : AppCompatActivity() {
             text = "로그"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.2f)
             setOnClickListener {
-                Toast.makeText(this@MainActivity, "로그 기능은 추후 구현 예정", Toast.LENGTH_SHORT).show()
+                startActivity(Intent(this@MainActivity, LogActivity::class.java))
             }
         }
 
@@ -141,7 +147,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         e.apply()
                     }
-
+                    LogBus.logRaw("데이터 삭제")
                     renderSavedFiles()
                     Toast.makeText(this@MainActivity, "삭제 완료", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {

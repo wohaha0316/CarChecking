@@ -150,8 +150,10 @@ class CheckListActivity : AppCompatActivity() {
     }
 
 
-    override fun onResume() { super.onResume(); if (this::adapter.isInitialized) updateStatus() }
-    override fun onPause() { super.onPause(); saveCheckState() }
+    override fun onResume() { super.onResume(); if (this::adapter.isInitialized) updateStatus()
+        LogBus.appOpen("차체크화면") }
+    override fun onPause() { super.onPause(); saveCheckState()
+        LogBus.appClose("차체크화면") }
 
     private fun showLoading(show: Boolean) {
         progress.visibility = if (show) View.VISIBLE else View.GONE

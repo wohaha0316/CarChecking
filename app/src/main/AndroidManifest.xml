@@ -31,7 +31,10 @@
         android:name=".CheckListActivity"
         android:exported="false"
         android:windowSoftInputMode="adjustResize" />
-
+        <activity
+            android:name=".LogActivity"
+            android:label="로그"
+            android:exported="false" />
         <!-- 여기에 기존 다른 activity/service/provider 선언들이 올 수 있음 -->
     </application>
 

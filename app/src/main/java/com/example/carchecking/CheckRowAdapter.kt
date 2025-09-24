@@ -15,6 +15,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.widget.TextViewCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.example.carchecking.LogBus
 
 /**
  * 차체크 화면 어댑터.
@@ -263,6 +264,15 @@ class CheckRowAdapter(
                 if (removedOrder > 0) {
                     rows.forEach { r -> if (r.checkOrder > removedOrder) r.checkOrder -= 1 }
                 }
+            }
+// B/L과 순번 값 준비
+            val bl = item.bl
+            if (nowChecked) {
+                // 확인으로 변경된 경우: 방금 부여한 nextOrder 사용
+                LogBus.checkConfirm(bl, item.checkOrder /* = nextOrder */)
+            } else {
+                // 확인 취소: 지워진 순번 removedOrder 사용
+                if (removedOrder > 0) LogBus.checkConfirmCancel(bl, removedOrder)
             }
 
             onToggle?.invoke(h.bindingAdapterPosition, nowChecked)
