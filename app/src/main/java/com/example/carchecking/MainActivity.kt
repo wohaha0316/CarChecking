@@ -10,6 +10,7 @@ import android.view.Gravity
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
 import java.io.File
 import com.example.carchecking.LogBus
@@ -29,10 +30,9 @@ class MainActivity : AppCompatActivity() {
             if (UploadedExcelStore.files.none { it.absolutePath == saved.absolutePath }) {
                 UploadedExcelStore.files.add(saved)
             }
-// (중략) UploadedExcelStore.files.add(saved)
-// (여기) 엑셀 업로드 로그
+            // 엑셀 업로드 로그
             LogBus.excelUpload(saved.name)
-// renderSavedFiles()
+
             renderSavedFiles()
             Toast.makeText(this, "${saved.name} 업로드 완료", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
@@ -49,10 +49,12 @@ class MainActivity : AppCompatActivity() {
         fileListLayout = findViewById(R.id.fileListLayout)
 
         btnSelectExcel.setOnClickListener {
-            pickExcelFile.launch(arrayOf(
-                "application/vnd.ms-excel",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            ))
+            pickExcelFile.launch(
+                arrayOf(
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            )
         }
 
         renderSavedFiles()
@@ -106,7 +108,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.2f)
             setOnClickListener {
                 val intent = Intent(this@MainActivity, LogActivity::class.java)
-                // 현재 addFileRow 파라미터로 받은 file 객체 → file.name 전달
+                // 현재 파일명을 모선명 디폴트로 전달
                 intent.putExtra(LogActivity.EXTRA_EXCEL_NAME, file.name)
                 startActivity(intent)
             }
@@ -116,50 +118,60 @@ class MainActivity : AppCompatActivity() {
             text = "X"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.1f)
             setOnClickListener {
-                try {
-                    if (file.exists()) file.delete()
-                    UploadedExcelStore.files.removeAll { it.absolutePath == file.absolutePath }
+                // ✅ 삭제 되묻기
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("삭제")
+                    .setMessage("삭제 하시겠습니까?")
+                    .setNegativeButton("취소", null)
+                    .setPositiveButton("삭제") { _, _ ->
+                        try {
+                            if (file.exists()) file.delete()
+                            UploadedExcelStore.files.removeAll { it.absolutePath == file.absolutePath }
 
-                    // ✅ 여기 추가: 이 파일의 keyId/레거시 경로에 해당하는 모든 상태/카운터 삭제
-                    val keyIdDel = ParsedCache.keyFor(file).id()
-                    val pNew = getSharedPreferences("carchecking_prefs", Context.MODE_PRIVATE)
-                    val pOld = getSharedPreferences("checklist_status", Context.MODE_PRIVATE)
+                            // ✅ 이 파일의 keyId/레거시 경로에 해당하는 모든 상태/카운터 삭제
+                            val keyIdDel = ParsedCache.keyFor(file).id()
+                            val pNew = getSharedPreferences("carchecking_prefs", Context.MODE_PRIVATE)
+                            val pOld = getSharedPreferences("checklist_status", Context.MODE_PRIVATE)
 
-                    // 새 포맷 키들 제거 (status:/check_orders:/ship_orders:)
-                    run {
-                        val e = pNew.edit()
-                        for (k in pNew.all.keys) {
-                            if (k.startsWith("status:$keyIdDel:") ||
-                                k.startsWith("check_orders:$keyIdDel:") ||
-                                k.startsWith("ship_orders:$keyIdDel:")) {
-                                e.remove(k)
+                            // 새 포맷 키들 제거 (status:/check_orders:/ship_orders:)
+                            run {
+                                val e = pNew.edit()
+                                for (k in pNew.all.keys) {
+                                    if (k.startsWith("status:$keyIdDel:") ||
+                                        k.startsWith("check_orders:$keyIdDel:") ||
+                                        k.startsWith("ship_orders:$keyIdDel:")) {
+                                        e.remove(k)
+                                    }
+                                }
+                                // 카운터 제거
+                                e.remove("check_orders:$keyIdDel:orderCounter")
+                                e.remove("ship_orders:$keyIdDel:orderCounter")
+                                e.apply()
                             }
-                        }
-                        // 카운터 제거
-                        e.remove("check_orders:$keyIdDel:orderCounter")
-                        e.remove("ship_orders:$keyIdDel:orderCounter")
-                        e.apply()
-                    }
 
-                    // 구버전 키 제거 ("<absolutePath>|" 프리픽스)
-                    run {
-                        val e = pOld.edit()
-                        val prefix = file.absolutePath + "|"
-                        for (k in pOld.all.keys) {
-                            if (k.startsWith(prefix)) e.remove(k)
+                            // 구버전 키 제거 ("<absolutePath>|" 프리픽스)
+                            run {
+                                val e = pOld.edit()
+                                val prefix = file.absolutePath + "|"
+                                for (k in pOld.all.keys) {
+                                    if (k.startsWith(prefix)) e.remove(k)
+                                }
+                                e.apply()
+                            }
+
+                            // ✅ 어떤 파일을 삭제했는지 로그에 남김
+                            LogBus.logRaw("데이터 삭제(${file.name})")
+
+                            renderSavedFiles()
+                            Toast.makeText(this@MainActivity, "삭제 완료: ${file.name}", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            Toast.makeText(this@MainActivity, "삭제 실패", Toast.LENGTH_SHORT).show()
                         }
-                        e.apply()
                     }
-                    LogBus.logRaw("데이터 삭제")
-                    renderSavedFiles()
-                    Toast.makeText(this@MainActivity, "삭제 완료", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    Toast.makeText(this@MainActivity, "삭제 실패", Toast.LENGTH_SHORT).show()
-                }
+                    .show()
             }
         }
-
 
         topRow.addView(fileBtn)
         topRow.addView(logBtn)
@@ -175,12 +187,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ✅ 현황 버튼: SharedPreferences에서 파일별 상태 불러옴(색상강조 유지)
-        val prefs = getSharedPreferences("checklist_status", Context.MODE_PRIVATE)
         val prefsNew = getSharedPreferences("carchecking_prefs", Context.MODE_PRIVATE)
         val prefsOld = getSharedPreferences("checklist_status", Context.MODE_PRIVATE)
         val keyId = ParsedCache.keyFor(file).id()
 
-// statusHtml 로드 (기존)
+        // statusHtml 로드 (기존)
         var statusHtml = prefsNew.getString("status:$keyId:html", null)
             ?: prefsOld.getString("${file.absolutePath}|html", null)
             ?: run {
@@ -190,31 +201,34 @@ class MainActivity : AppCompatActivity() {
                     prefsOld.getInt("${file.absolutePath}|clearanceX", 0))
                 val checked = prefsNew.getInt("status:$keyId:checked",
                     prefsOld.getInt("${file.absolutePath}|checked", 0))
-                // ✅ 업로드 직후에도 '선적 0 대'를 기본으로 포함
+                // ✅ 업로드 직후에도 '선적 0 대' 기본 포함
                 "전체 <font color='#000000'>${total} 대</font>  " +
                         "면장X <font color='#CC0000'>${clearanceX} 대</font>  " +
                         "확인 <font color='#1E90FF'>${checked} 대</font>  " +
                         "선적 <font color='#008000'>0 대</font>"
             }
 
-// ✅ normalize: 누락된 '선적' 세그먼트 보강 + 색상 통일
-        if (statusHtml != null) {
-            if (!statusHtml!!.contains("선적")) {
-                statusHtml = statusHtml + "  선적 <font color='#008000'>0 대</font>"
+        // ✅ normalize: 누락된 '선적' 세그먼트 보강 + 색상 통일
+        statusHtml = (statusHtml ?: "").let { s0 ->
+            var s = s0
+            if (!s.contains("선적")) {
+                s += if (s.isEmpty()) {
+                    "선적 <font color='#008000'>0 대</font>"
+                } else {
+                    "  선적 <font color='#008000'>0 대</font>"
+                }
             }
-            statusHtml = statusHtml!!
-                .replace("#FF0000", "#CC0000") // 빨강 통일
+            s.replace("#FF0000", "#CC0000")
                 .replace("#ff0000", "#CC0000")
-                .replace("#1e90ff", "#1E90FF") // 파랑 케이스 통일
+                .replace("#1e90ff", "#1E90FF")
         }
-
 
 
         val statusBtn = Button(this).apply {
             text = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N)
-                android.text.Html.fromHtml(statusHtml, android.text.Html.FROM_HTML_MODE_LEGACY)
+                android.text.Html.fromHtml(statusHtml.orEmpty(), android.text.Html.FROM_HTML_MODE_LEGACY)
             else
-                android.text.Html.fromHtml(statusHtml)
+                android.text.Html.fromHtml(statusHtml.orEmpty())
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
@@ -223,10 +237,11 @@ class MainActivity : AppCompatActivity() {
             isAllCaps = false
             isSingleLine = true
             ellipsize = TextUtils.TruncateAt.END
-            textSize = 16f                                    // ✅ +2pt
-            typeface = android.graphics.Typeface.DEFAULT_BOLD // ✅ 굵게
+            textSize = 16f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             setOnClickListener { /* 클릭 없음 */ }
         }
+
         bottomRow.addView(statusBtn)
 
         // 3줄: 선적 체크(왼쪽) + 차체크(오른쪽)
@@ -303,6 +318,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "열 수 있는 엑셀 앱이 없습니다", Toast.LENGTH_SHORT).show()
         }
     }
+
     override fun onResume() {
         super.onResume()
         renderSavedFiles()  // ✅ 돌아올 때 현황 버튼/리스트 다시 그리기

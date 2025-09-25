@@ -101,7 +101,7 @@ class ShippingCheckActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        LogBus.appOpen("선적화면")
+        LogBus.appClose("선적화면")
         super.onPause()
         updateStatus()   // ✅ 나갈 때 최종 저장
     }
