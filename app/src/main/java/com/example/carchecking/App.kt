@@ -14,7 +14,9 @@ class App : Application() {
         if (isDebug) {
             StrictMode.setThreadPolicy(
                 StrictMode.ThreadPolicy.Builder()
-                    .detectAll()
+                    .detectNetwork()
+                    .detectDiskReads()
+                    .detectDiskWrites()
                     .penaltyLog()
                     .build()
             )
