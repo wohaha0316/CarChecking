@@ -2,6 +2,7 @@ package com.example.carchecking
 
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.text.SpannableStringBuilder
 import android.text.TextUtils
@@ -22,6 +23,8 @@ import com.example.carchecking.LogBus
  * - ‘확인’ 버튼 텍스트 자동맞춤(버튼 안에 딱 맞게)
  * - 액티비티 의존 없음(캐스팅 제거)
  * - 순번 부여/당겨오기를 어댑터 내부에서 수행
+ * - 행 롱프레스 → 특이사항 메모 콜백
+ * - 메모가 있는 행: BL 칸 붉은 테두리 표시
  */
 class CheckRowAdapter(
     private var rows: List<CheckRow>,
@@ -32,12 +35,24 @@ class CheckRowAdapter(
     private val TYPE_DATA = 0
     private val TYPE_LABEL = 1
 
+    // ===== 특이사항 메모 연동 =====
+    /** 행 롱프레스 콜백: (행 인덱스, B/L 문자열) */
+    var onRowLongPress: ((Int, String) -> Unit)? = null
+
+    /** 메모가 있는 행들의 포지션 집합 */
+    private val notedPositions = mutableSetOf<Int>()
+    fun setNotedPositions(set: Set<Int>) {
+        notedPositions.clear()
+        notedPositions.addAll(set)
+        notifyDataSetChanged()
+    }
+    // ============================
+
     override fun getItemViewType(position: Int) =
         if (rows[position].isLabelRow) TYPE_LABEL else TYPE_DATA
 
     private fun dp(v: View, dp: Float) = (dp * v.context.resources.displayMetrics.density).toInt()
     private fun spToPx(v: View, sp: Float) = (sp * v.context.resources.displayMetrics.scaledDensity).toInt()
-
     @Suppress("WrongConstant")
     private fun tvTight(tv: TextView, sizeSp: Float) {
         tv.textSize = sizeSp
@@ -106,7 +121,7 @@ class CheckRowAdapter(
                 // 정렬 그대로 유지
                 textAlignment = View.TEXT_ALIGNMENT_VIEW_START
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                // ◀ 왼쪽 패딩 2dp 적용 (나머지는 0)
+                // 왼쪽 패딩 4dp
                 setPadding(dp(this, 4f), 0, 0, 0)
             }
             val bl = TextView(parent.context).apply {
@@ -129,7 +144,6 @@ class CheckRowAdapter(
                 layoutParams = lpTop(ui.wCar)
                 tvTight(this, ui.fCar)
                 isSingleLine = false; maxLines = Int.MAX_VALUE; ellipsize = null
-                // ▶ 오른쪽 패딩 0으로
                 setPadding(0, 0, 0, 0)
             }
 
@@ -146,34 +160,63 @@ class CheckRowAdapter(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
 
-                // ✅ 중앙정렬
+                // 중앙정렬
                 gravity = Gravity.CENTER
                 textAlignment = View.TEXT_ALIGNMENT_CENTER
 
-                // ✅ 굵게 + 빨간색 (현황판과 동일 #CC0000)
+                // 굵게 + 빨간색 (현황판과 동일 #CC0000)
                 setTextColor(Color.parseColor("#CC0000"))
                 typeface = Typeface.DEFAULT_BOLD
             }
             val checkBtn = Button(parent.context).apply {
-                layoutParams = lpCenter(ui.wCheck)
+                // 버튼은 행 높이를 따라가게(MATCH_PARENT)
+                val lp = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    ui.wCheck
+                )
+                // 버튼 사이 여유(위아래 4dp)
+                lp.topMargin = dp(this, 4f)
+                lp.bottomMargin = dp(this, 4f)
+                layoutParams = lp
+
                 text = "확인"
                 isAllCaps = false
                 isSingleLine = true
                 includeFontPadding = false
-                minHeight = 0; minimumHeight = 0
-                setPadding(dp(this, 8f), dp(this, 2f), dp(this, 8f), dp(this, 2f))
+
+                minHeight = 0
+                minimumHeight = 0
+
+                // 내부 패딩(행 높이에 종속, 과도하지 않게)
+                setPadding(dp(this, 12f), dp(this, 4f), dp(this, 12f), dp(this, 4f))
+
                 setBackgroundColor(Color.parseColor("#CCCCCC"))
                 setTextColor(Color.parseColor("#000000"))
-                // ✅ 텍스트 자동맞춤: 10sp ~ 14sp 범위
+
                 TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
                     this, 10, 14, 1, TypedValue.COMPLEX_UNIT_SP
                 )
             }
 
+            // === 롱프레스: 특이사항 입력 콜백 호출 ===
+            val holder = DataVH(row, seq, bl, haju, car, qty, clearance, checkBtn)
+            row.setOnLongClickListener {
+                val pos = holder.bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    val item = rows[pos]
+                    if (!item.isLabelRow) {
+                        onRowLongPress?.invoke(pos, item.bl)
+                        return@setOnLongClickListener true
+                    }
+                }
+                false
+            }
+
             row.addView(seq); row.addView(bl); row.addView(haju); row.addView(car)
             row.addView(qty); row.addView(clearance); row.addView(checkBtn)
 
-            DataVH(row, seq, bl, haju, car, qty, clearance, checkBtn)
+            holder
         }
     }
 
@@ -239,15 +282,19 @@ class CheckRowAdapter(
 
         if (item.isChecked) {
             h.checkBtn.text = item.checkOrder.takeIf { it > 0 }?.toString() ?: ""
-            h.checkBtn.setBackgroundColor(Color.parseColor("#1E90FF"))
-            h.checkBtn.setTextColor(Color.parseColor("#FFFFFF"))
+            h.checkBtn.setBackgroundColor(BLUE)
+            h.checkBtn.setTextColor(ON_PRIMARY)
             h.checkBtn.typeface = Typeface.DEFAULT_BOLD
         } else {
-            h.checkBtn.text = ""                 // ◀ 미확인 시 텍스트 제거
-            h.checkBtn.setBackgroundColor(Color.parseColor("#CCCCCC"))
-            h.checkBtn.setTextColor(Color.parseColor("#000000"))
+            h.checkBtn.text = ""                 // 미확인 시 텍스트 제거
+            h.checkBtn.setBackgroundColor(GREY)
+            h.checkBtn.setTextColor(ON_GREY)
             h.checkBtn.typeface = Typeface.DEFAULT
         }
+
+        // 메모 강조: BL 칸에 붉은 테두리
+        val hasNote = notedPositions.contains(pos)
+        applyRedStroke(h.bl, hasNote)
 
         // 클릭: 순번 관리(앞 번호 해제 시 뒤 번호 1씩 당김)
         h.checkBtn.setOnClickListener {
@@ -265,13 +312,11 @@ class CheckRowAdapter(
                     rows.forEach { r -> if (r.checkOrder > removedOrder) r.checkOrder -= 1 }
                 }
             }
-// B/L과 순번 값 준비
+            // 로그
             val bl = item.bl
             if (nowChecked) {
-                // 확인으로 변경된 경우: 방금 부여한 nextOrder 사용
-                LogBus.checkConfirm(bl, item.checkOrder /* = nextOrder */)
+                LogBus.checkConfirm(bl, item.checkOrder)
             } else {
-                // 확인 취소: 지워진 순번 removedOrder 사용
                 if (removedOrder > 0) LogBus.checkConfirmCancel(bl, removedOrder)
             }
 
@@ -284,6 +329,20 @@ class CheckRowAdapter(
 
     fun updateData(newRows: List<CheckRow>) { rows = newRows; notifyDataSetChanged() }
     fun updateUi(newUi: UiConfig) { ui = newUi; notifyDataSetChanged() }
+
+    // 붉은 테두리 적용/해제
+    private fun applyRedStroke(tv: TextView, enable: Boolean) {
+        if (!enable) {
+            tv.background = null
+            return
+        }
+        val d = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT)
+            setStroke(dp(tv, 2f), Color.parseColor("#CC0000"))
+            cornerRadius = dp(tv, 4f).toFloat()
+        }
+        tv.background = d
+    }
 
     class DataVH(
         row: View,

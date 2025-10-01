@@ -205,4 +205,13 @@ object LogBus {
     }
 
     private fun String.safeBL(): String = trim()
+
+    fun noteAdd(fileKey: String, rowIndex: Int, bl: String, text: String) {
+        // println(...) 말고 ↓ 이렇게 통일
+        logRaw("${bl.safeBL()} 특이사항: ${cut(text, 100)}")
+    }
+
+    fun noteDelete(fileKey: String, rowIndex: Int, bl: String) {
+        logRaw("${bl.safeBL()} 특이사항 삭제")
+    }
 }

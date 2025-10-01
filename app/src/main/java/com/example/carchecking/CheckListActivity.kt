@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -51,7 +52,14 @@ class CheckListActivity : AppCompatActivity() {
     private lateinit var keyId: String
 
     private lateinit var uiConfig: UiConfig
-    private lateinit var eventRepo: EventRepository   // ★ 추가
+    private lateinit var eventRepo: EventRepository
+
+    // ======== 특이사항 메모용 ========
+    private lateinit var db: AppDatabase
+    private lateinit var notesDao: NoteDao
+    /** 메모가 있는 '행 인덱스(현재 리스트 기준)' — 간단 구현 */
+    private val noted = mutableSetOf<Int>()
+    // ==============================
 
     private var sortKey: SortKey = SortKey.NONE
     private var sortAsc: Boolean = true
@@ -81,7 +89,11 @@ class CheckListActivity : AppCompatActivity() {
         keyId = ParsedCache.keyFor(currentFile).id()
         uiConfig = UiPrefs.load(this, keyId)
         uiConfig.rowSpacing = 0f
-        eventRepo = EventRepository(this) // ★ 추가
+        eventRepo = EventRepository(this)
+
+        // DB 준비
+        db = AppDatabase.get(this)
+        notesDao = db.notes()
 
         showLoading(true)
         lifecycleScope.launch {
@@ -97,10 +109,17 @@ class CheckListActivity : AppCompatActivity() {
 
             allRows = parsed; rows = parsed.toMutableList()
 
-            adapter = CheckRowAdapter(rows, uiConfig,
-                onToggle = { position, nowChecked -> onRowToggled(position, nowChecked) } // ★ 추가
-            )
+            adapter = CheckRowAdapter(
+                rows, uiConfig,
+                onToggle = { position, nowChecked -> onRowToggled(position, nowChecked) }
+            ).also { ad ->
+                // 롱프레스 → 특이사항 다이얼로그
+                ad.onRowLongPress = { pos, bl -> showNoteDialog(pos, bl) }
+            }
             recycler.adapter = adapter
+
+            // 파일에 저장된 메모 로드 → 표시
+            loadNotesAndMark()
 
             applyUiToHeader(uiConfig)
             applyDivider(uiConfig.showRowDividers)
@@ -135,7 +154,21 @@ class CheckListActivity : AppCompatActivity() {
         }
     }
 
-    // ★ 체크/해제 시 DB 이벤트 기록
+    // 특이사항: DB에서 불러와 어댑터에 표시
+    private fun loadNotesAndMark() {
+        lifecycleScope.launch {
+            val list = withContext(Dispatchers.IO) { notesDao.listByFile(keyId) }
+            noted.clear()
+            // 간단 구현: 현재 rows 인덱스 기준으로 저장했음을 가정
+            // (필터/정렬 시 위치가 바뀔 수 있음. 고도화는 추후)
+            list.forEach { n ->
+                if (n.rowIndex in rows.indices) noted.add(n.rowIndex)
+            }
+            adapter.setNotedPositions(noted)
+        }
+    }
+
+    // 체크/해제 시 DB 이벤트 기록
     fun onRowToggled(position: Int, nowChecked: Boolean) {
         val user = getSharedPreferences("user_profile", MODE_PRIVATE).getString("checker_name", null)
         lifecycleScope.launch {
@@ -145,15 +178,62 @@ class CheckListActivity : AppCompatActivity() {
                 checked = nowChecked,
                 user = user
             )
-            updateStatus() // ✅ 즉시 갱신
+            updateStatus()
         }
     }
-
 
     override fun onResume() { super.onResume(); if (this::adapter.isInitialized) updateStatus()
         LogBus.appOpen("차체크화면") }
     override fun onPause() { super.onPause(); saveCheckState()
         LogBus.appClose("차체크화면") }
+
+    // ===== 특이사항 메모 다이얼로그 =====
+    private fun showNoteDialog(pos: Int, bl: String) {
+        val ctx = this
+        val et = EditText(ctx).apply {
+            setLines(4)
+            gravity = Gravity.TOP
+            hint = "특이사항 메모를 입력하세요 (비워두면 삭제)"
+        }
+
+        // 기존 메모 로딩
+        lifecycleScope.launch {
+            val existing = withContext(Dispatchers.IO) { notesDao.get(keyId, pos) }
+            et.setText(existing?.text ?: "")
+        }
+
+        AlertDialog.Builder(ctx)
+            .setTitle("특이사항 - $bl")
+            .setView(et)
+            .setNegativeButton("취소", null)
+            .setPositiveButton("완료") { _, _ ->
+                val text = et.text?.toString()?.trim().orEmpty()
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        if (text.isEmpty()) {
+                            notesDao.delete(keyId, pos)
+                            LogBus.noteDelete(keyId, pos, bl)   // ★ 삭제 로그
+                        } else {
+                            notesDao.upsert(
+                                Note(
+                                    fileKey = keyId,
+                                    rowIndex = pos,
+                                    bl = bl,
+                                    text = text,
+                                    updatedTs = System.currentTimeMillis()
+                                )
+                            )
+                            LogBus.noteAdd(keyId, pos, bl, text)   // ★ 추가/수정 로그
+                        }
+                    }
+                    if (text.isEmpty()) noted.remove(pos) else noted.add(pos)
+                    adapter.setNotedPositions(noted)
+                }
+            }
+
+            .show()
+    }
+    // =================================
 
     private fun showLoading(show: Boolean) {
         progress.visibility = if (show) View.VISIBLE else View.GONE
@@ -210,7 +290,6 @@ class CheckListActivity : AppCompatActivity() {
                 "확인 <font color='#1E90FF'>${checked} 대</font>  " +
                 "선적 <font color='#008000'>${shipped} 대</font>"
 
-
     fun updateStatus() {
         val totalCars = rows.count { !it.isLabelRow && it.bl.isNotBlank() }
         val clearanceX = rows.filter { !it.isLabelRow }.count { it.clearance.equals("X", true) }
@@ -233,7 +312,6 @@ class CheckListActivity : AppCompatActivity() {
     private fun readShipState(idx: Int): Boolean =
         getSharedPreferences(PREF_NAME, MODE_PRIVATE)
             .getBoolean("ship_orders:${keyId}:${idx}_shipped", false)
-
 
     private fun saveCheckState() {
         val e = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
@@ -432,7 +510,13 @@ class CheckListActivity : AppCompatActivity() {
     }
     private fun applyFilter(q: String?) {
         val query = q?.trim()?.lowercase(Locale.ROOT).orEmpty()
-        if (query.isEmpty()) { rows = allRows.toMutableList(); adapter.updateData(rows); updateStatus(); return }
+        if (query.isEmpty()) {
+            rows = allRows.toMutableList()
+            adapter.updateData(rows)
+            adapter.setNotedPositions(noted) // 표시 유지
+            updateStatus()
+            return
+        }
         val result = mutableListOf<CheckRow>()
         var currentLabel: CheckRow? = null
         var buffer = mutableListOf<CheckRow>()
@@ -444,7 +528,11 @@ class CheckListActivity : AppCompatActivity() {
                     r.clearance.lowercase(Locale.ROOT).contains(query)
             if (hit) buffer += r
         }
-        flush(); rows = result; adapter.updateData(rows); updateStatus()
+        flush(); rows = result; adapter.updateData(rows)
+        // 간단 표시: 현재 rows 인덱스 기준으로도 noted와 교집합만 표시 (필요 시 고도화)
+        val filteredNoted = noted.filter { it in rows.indices }.toSet()
+        adapter.setNotedPositions(filteredNoted)
+        updateStatus()
     }
 
     private fun dp(v: View, dp: Float) = (dp * v.context.resources.displayMetrics.density).toInt()

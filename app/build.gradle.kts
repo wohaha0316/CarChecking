@@ -1,3 +1,34 @@
+import java.util.Properties
+
+val ksProps = Properties()
+val ksFile = rootProject.file("keystore.properties")
+val hasKeystore = ksFile.exists()
+if (hasKeystore) ksFile.inputStream().use { ksProps.load(it) }
+
+android {
+    signingConfigs {
+        if (hasKeystore) {
+            create("release") {
+                storeFile = file(ksProps["storeFile"] ?: "")
+                storePassword = ksProps["storePassword"] as String?
+                keyAlias = ksProps["keyAlias"] as String?
+                keyPassword = ksProps["keyPassword"] as String?
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            // keystore 있을 때만 서명 사용
+            if (hasKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+        getByName("debug") {
+            // 디버그는 기본 debug keystore 사용
+        }
+    }
+}
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")

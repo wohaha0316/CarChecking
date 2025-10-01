@@ -13,3 +13,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# 🔒 Signing keys (절대 커밋 금지)
+keystore.properties
+*.jks
+*.keystore
+
+# (선택) 빌드 산출물
+app/release/
+app/debug/
