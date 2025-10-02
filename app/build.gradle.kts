@@ -111,6 +111,16 @@ dependencies {
 
     // (선택) 명시적으로 하나만 쓰기
     implementation("androidx.annotation:annotation-experimental:1.4.0")
+
+    // CameraX
+    val camerax = "1.3.4"
+    implementation("androidx.camera:camera-core:$camerax")
+    implementation("androidx.camera:camera-camera2:$camerax")
+    implementation("androidx.camera:camera-lifecycle:$camerax")
+    implementation("androidx.camera:camera-view:$camerax")
+
+    // ML Kit - Text Recognition (on-device)
+    implementation("com.google.mlkit:text-recognition:16.0.0")
 }
 
 kotlin { jvmToolchain(17) }

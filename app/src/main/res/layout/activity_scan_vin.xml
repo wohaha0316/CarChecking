@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+
+    <!-- 상단 힌트 -->
+    <TextView
+        android:id="@+id/tvHint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="VIN 17자리를 가이드에 맞춰주세요"
+        android:textColor="#FFFFFF"
+        android:padding="12dp"
+        android:background="#66000000"
+        android:layout_gravity="top|center_horizontal"
+        android:visibility="gone"
+        />
+
+    <!-- 오른쪽 상단 버튼들 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_gravity="top|end"
+        android:padding="8dp">
+
+        <ImageButton
+            android:id="@+id/btnTorch"
+            android:layout_width="48dp" android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:src="@android:drawable/button_onoff_indicator_on"
+            android:contentDescription="토치"
+            android:alpha="0.5"/>
+
+        <ImageButton
+            android:id="@+id/btnClose"
+            android:layout_width="48dp" android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="닫기"/>
+    </LinearLayout>
+
+    <!-- 간단 가이드 박스(시각적만) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_gravity="center"
+        android:background="@android:color/transparent"
+        android:foreground="@android:drawable/editbox_background"
+        android:alpha="0.4"/>
+</FrameLayout>

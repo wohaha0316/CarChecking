@@ -16,7 +16,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.widget.TextViewCompat
 import androidx.recyclerview.widget.RecyclerView
-import com.example.carchecking.LogBus
 
 /**
  * 차체크 화면 어댑터.
@@ -24,7 +23,7 @@ import com.example.carchecking.LogBus
  * - 액티비티 의존 없음(캐스팅 제거)
  * - 순번 부여/당겨오기를 어댑터 내부에서 수행
  * - 행 롱프레스 → 특이사항 메모 콜백
- * - 메모가 있는 행: BL 칸 붉은 테두리 표시
+ * - ✅ 메모 표시: B/L 기준으로 BL 칸에 붉은 테두리
  */
 class CheckRowAdapter(
     private var rows: List<CheckRow>,
@@ -39,11 +38,10 @@ class CheckRowAdapter(
     /** 행 롱프레스 콜백: (행 인덱스, B/L 문자열) */
     var onRowLongPress: ((Int, String) -> Unit)? = null
 
-    /** 메모가 있는 행들의 포지션 집합 */
-    private val notedPositions = mutableSetOf<Int>()
-    fun setNotedPositions(set: Set<Int>) {
-        notedPositions.clear()
-        notedPositions.addAll(set)
+    /** ✅ 메모가 있는 B/L 집합 */
+    private var notedBLs: Set<String> = emptySet()
+    fun setNotedBLs(set: Set<String>) {
+        notedBLs = set
         notifyDataSetChanged()
     }
     // ============================
@@ -118,10 +116,8 @@ class CheckRowAdapter(
                 tvTight(this, ui.fNo)
                 isSingleLine = true; maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                // 정렬 그대로 유지
                 textAlignment = View.TEXT_ALIGNMENT_VIEW_START
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                // 왼쪽 패딩 4dp
                 setPadding(dp(this, 4f), 0, 0, 0)
             }
             val bl = TextView(parent.context).apply {
@@ -159,23 +155,17 @@ class CheckRowAdapter(
                 isSingleLine = true
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-
-                // 중앙정렬
                 gravity = Gravity.CENTER
                 textAlignment = View.TEXT_ALIGNMENT_CENTER
-
-                // 굵게 + 빨간색 (현황판과 동일 #CC0000)
                 setTextColor(Color.parseColor("#CC0000"))
                 typeface = Typeface.DEFAULT_BOLD
             }
             val checkBtn = Button(parent.context).apply {
-                // 버튼은 행 높이를 따라가게(MATCH_PARENT)
                 val lp = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     ui.wCheck
                 )
-                // 버튼 사이 여유(위아래 4dp)
                 lp.topMargin = dp(this, 4f)
                 lp.bottomMargin = dp(this, 4f)
                 layoutParams = lp
@@ -184,13 +174,9 @@ class CheckRowAdapter(
                 isAllCaps = false
                 isSingleLine = true
                 includeFontPadding = false
-
                 minHeight = 0
                 minimumHeight = 0
-
-                // 내부 패딩(행 높이에 종속, 과도하지 않게)
                 setPadding(dp(this, 12f), dp(this, 4f), dp(this, 12f), dp(this, 4f))
-
                 setBackgroundColor(Color.parseColor("#CCCCCC"))
                 setTextColor(Color.parseColor("#000000"))
 
@@ -199,8 +185,9 @@ class CheckRowAdapter(
                 )
             }
 
-            // === 롱프레스: 특이사항 입력 콜백 호출 ===
             val holder = DataVH(row, seq, bl, haju, car, qty, clearance, checkBtn)
+
+            // === 롱프레스: 특이사항 입력 콜백 호출 ===
             row.setOnLongClickListener {
                 val pos = holder.bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) {
@@ -286,14 +273,15 @@ class CheckRowAdapter(
             h.checkBtn.setTextColor(ON_PRIMARY)
             h.checkBtn.typeface = Typeface.DEFAULT_BOLD
         } else {
-            h.checkBtn.text = ""                 // 미확인 시 텍스트 제거
+            h.checkBtn.text = ""
             h.checkBtn.setBackgroundColor(GREY)
             h.checkBtn.setTextColor(ON_GREY)
             h.checkBtn.typeface = Typeface.DEFAULT
         }
 
-        // 메모 강조: BL 칸에 붉은 테두리
-        val hasNote = notedPositions.contains(pos)
+        // ✅ 메모 강조: "현재 행의 BL"이 notedBLs에 있으면 붉은 테두리
+        val blKey = blRawAll.trim()
+        val hasNote = blKey.isNotEmpty() && notedBLs.contains(blKey)
         applyRedStroke(h.bl, hasNote)
 
         // 클릭: 순번 관리(앞 번호 해제 시 뒤 번호 1씩 당김)
@@ -312,7 +300,8 @@ class CheckRowAdapter(
                     rows.forEach { r -> if (r.checkOrder > removedOrder) r.checkOrder -= 1 }
                 }
             }
-            // 로그
+
+            // 로그(외부 LogBus 사용)
             val bl = item.bl
             if (nowChecked) {
                 LogBus.checkConfirm(bl, item.checkOrder)

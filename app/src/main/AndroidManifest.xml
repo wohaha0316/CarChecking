@@ -3,6 +3,10 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.carchecking">
 
+    <!-- 📌 여기다가 권한 추가 -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
     <application
         android:name=".App"
         android:fullBackupContent="@xml/backup_rules"
@@ -15,7 +19,7 @@
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         tools:replace="android:allowBackup,android:label,android:icon,android:roundIcon,android:theme">
 
-        <!-- 런처 액티비티 (이미 있을 수 있음) -->
+        <!-- 런처 액티비티 -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -25,7 +29,7 @@
             </intent-filter>
         </activity>
 
-        <!-- ✅ 선적 화면: 딱 1번만 선언 -->
+        <!-- ✅ 선적 화면 -->
         <activity
             android:name=".ShippingCheckActivity"
             android:exported="false"
@@ -38,8 +42,15 @@
             android:name=".LogActivity"
             android:label="로그"
             android:exported="false" />
-        <!-- 여기에 기존 다른 activity/service/provider 선언들이 올 수 있음 -->
-        <!-- 엑셀 외부앱 열기용 FileProvider -->
+
+        <!-- VIN 스캔 화면 -->
+        <activity
+            android:name=".ScanVinActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+
+        <!-- 파일 공유용 FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

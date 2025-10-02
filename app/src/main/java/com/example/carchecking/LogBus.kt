@@ -9,7 +9,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.Executors
-
+import java.io.File
 data class LogEntry(val ts: Long, val user: String, val content: String) {
     fun timeText(): String =
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(ts))
@@ -214,4 +214,11 @@ object LogBus {
     fun noteDelete(fileKey: String, rowIndex: Int, bl: String) {
         logRaw("${bl.safeBL()} 특이사항 삭제")
     }
+
+    fun vinScanned(vin: String) = logRaw("VIN 스캔: $vin")
+    fun vinMatched(vin: String, bl: String) = logRaw("VIN 매칭: $vin -> $bl")
+    fun vinMatchedCrossFile(vin: String, toFile: String, bl: String) =
+        logRaw("VIN 교차매칭: $vin -> ${File(toFile).name} / $bl")
+    fun vinUnmatched(vin: String) = logRaw("VIN 미매칭: $vin")
+    fun vinScan(vin: String) = logRaw("[차대번호 $vin] 스캔")
 }

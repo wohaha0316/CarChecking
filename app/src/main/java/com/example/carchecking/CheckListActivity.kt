@@ -1,6 +1,9 @@
 package com.example.carchecking
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -8,6 +11,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -57,8 +61,8 @@ class CheckListActivity : AppCompatActivity() {
     // ======== 특이사항 메모용 ========
     private lateinit var db: AppDatabase
     private lateinit var notesDao: NoteDao
-    /** 메모가 있는 '행 인덱스(현재 리스트 기준)' — 간단 구현 */
-    private val noted = mutableSetOf<Int>()
+    /** ✅ 메모 표시를 B/L 기준으로 관리 */
+    private val notedBLs = mutableSetOf<String>()
     // ==============================
 
     private var sortKey: SortKey = SortKey.NONE
@@ -68,6 +72,16 @@ class CheckListActivity : AppCompatActivity() {
     private var searchBar: View? = null
     private var searchEdit: EditText? = null
     private var rowDivider: RecyclerView.ItemDecoration? = null
+
+    // ===== 스캐너 호출/결과 =====
+    private val vinScanLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { res ->
+        if (res.resultCode == RESULT_OK) {
+            val vin = res.data?.getStringExtra("vin")?.let(VinUtils::normalize) ?: return@registerForActivityResult
+            showVinConfirmDialog(vin) // ★ 스캔 즉시 확인창
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -145,7 +159,19 @@ class CheckListActivity : AppCompatActivity() {
                 }
             }
             findViewById<Button?>(R.id.btnSearch)?.apply { text = "찾기"; setOnClickListener { toggleSearchBar() } }
-            findViewById<Button?>(R.id.btnCamera)?.apply { text = "카메라" }
+
+            // ▼▼ 카메라 버튼: 스캐너 실행 연결
+            findViewById<Button?>(R.id.btnCamera)?.apply {
+                text = "카메라"
+                setOnClickListener { openVinScanner() }
+            }
+
+            // ---- VIN 인덱싱: 현재 파일을 세션 전역 인덱스에 등록
+            VinIndexManager.indexFile(
+                fileKey = keyId,
+                filePath = currentFile.absolutePath,
+                rows = allRows
+            )
 
             restoreCheckState()
             updateStatus()
@@ -154,17 +180,81 @@ class CheckListActivity : AppCompatActivity() {
         }
     }
 
-    // 특이사항: DB에서 불러와 어댑터에 표시
+    // 스캐너 열기
+    private fun openVinScanner() {
+        vinScanLauncher.launch(Intent(this, ScanVinActivity::class.java))
+    }
+
+    // ★ 스캔 확인 다이얼로그 (복사/확인/취소)
+    private fun showVinConfirmDialog(vin: String) {
+        LogBus.logRaw("[차대번호 $vin] 스캔")   // 무조건 로그 남김
+
+        AlertDialog.Builder(this)
+            .setTitle("스캔된 VIN 확인")
+            .setMessage(vin)
+            .setNegativeButton("취소", null)
+            .setNeutralButton("복사") { _, _ ->
+                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("VIN", vin))
+                Toast.makeText(this, "복사됨: $vin", Toast.LENGTH_SHORT).show()
+            }
+            .setPositiveButton("확인") { _, _ -> handleScannedVin(vin) }
+            .show()
+    }
+
+    // 스캔 결과 처리: 현재 파일 → 세션 내 다른 파일 순서로 매칭
+    private fun handleScannedVin(vin: String) {
+        // 1) 현재 파일에서 매칭
+        val hitNow = VinIndexManager.findInCurrent(keyId, vin)
+        if (hitNow != null) {
+            smoothScrollAndBlink(hitNow.rowIndex)
+            Toast.makeText(this, "현재 리스트에서 매칭: ${hitNow.bl}", Toast.LENGTH_SHORT).show()
+            LogBus.logRaw("VIN 매칭(현재): $vin -> ${hitNow.bl}")
+            return
+        }
+
+        // 2) 세션 내 다른 파일에서 매칭
+        val hits = VinIndexManager.findInOthers(keyId, vin)
+        if (hits.isNotEmpty()) {
+            val top = hits.first()
+            AlertDialog.Builder(this)
+                .setTitle("다른 리스트에서 발견")
+                .setMessage("${File(top.filePath).name}\nB/L: ${top.bl}\n해당 파일을 열고 이동할까요?")
+                .setNegativeButton("취소", null)
+                .setPositiveButton("열기") { _, _ ->
+                    LogBus.logRaw("VIN 교차매칭: $vin -> ${File(top.filePath).name} / ${top.bl}")
+                    val i = Intent(this, CheckListActivity::class.java)
+                    i.putExtra("filePath", top.filePath)
+                    startActivity(i)
+                }
+                .show()
+            return
+        }
+
+        // 3) 어디에도 없음 (다음 단계: 선입고 저장 예정)
+        Toast.makeText(this, "어느 리스트에도 없음 (선입고는 다음 단계에서)", Toast.LENGTH_SHORT).show()
+        LogBus.logRaw("VIN 미매칭: $vin")
+    }
+
+    // 간단 하이라이트(깜빡임)
+    private fun smoothScrollAndBlink(rowIndex: Int) {
+        recycler.smoothScrollToPosition(rowIndex)
+        recycler.postDelayed({
+            val vh = recycler.findViewHolderForAdapterPosition(rowIndex) ?: return@postDelayed
+            val v = vh.itemView
+            v.animate().alpha(0.4f).setDuration(120).withEndAction {
+                v.animate().alpha(1f).setDuration(120).start()
+            }.start()
+        }, 300)
+    }
+
+    // ✅ 특이사항: DB에서 불러와 어댑터에 BL기반 표시
     private fun loadNotesAndMark() {
         lifecycleScope.launch {
             val list = withContext(Dispatchers.IO) { notesDao.listByFile(keyId) }
-            noted.clear()
-            // 간단 구현: 현재 rows 인덱스 기준으로 저장했음을 가정
-            // (필터/정렬 시 위치가 바뀔 수 있음. 고도화는 추후)
-            list.forEach { n ->
-                if (n.rowIndex in rows.indices) noted.add(n.rowIndex)
-            }
-            adapter.setNotedPositions(noted)
+            notedBLs.clear()
+            notedBLs.addAll(list.map { it.bl.trim() }.filter { it.isNotEmpty() })
+            adapter.setNotedBLs(notedBLs)
         }
     }
 
@@ -182,10 +272,16 @@ class CheckListActivity : AppCompatActivity() {
         }
     }
 
-    override fun onResume() { super.onResume(); if (this::adapter.isInitialized) updateStatus()
-        LogBus.appOpen("차체크화면") }
-    override fun onPause() { super.onPause(); saveCheckState()
-        LogBus.appClose("차체크화면") }
+    override fun onResume() {
+        super.onResume()
+        if (this::adapter.isInitialized) updateStatus()
+        LogBus.appOpen("차체크화면")
+    }
+    override fun onPause() {
+        super.onPause()
+        saveCheckState()
+        LogBus.appClose("차체크화면")
+    }
 
     // ===== 특이사항 메모 다이얼로그 =====
     private fun showNoteDialog(pos: Int, bl: String) {
@@ -196,9 +292,9 @@ class CheckListActivity : AppCompatActivity() {
             hint = "특이사항 메모를 입력하세요 (비워두면 삭제)"
         }
 
-        // 기존 메모 로딩
+        // 기존 메모 로딩 (✅ BL 기준)
         lifecycleScope.launch {
-            val existing = withContext(Dispatchers.IO) { notesDao.get(keyId, pos) }
+            val existing = withContext(Dispatchers.IO) { notesDao.getByBl(keyId, bl) }
             et.setText(existing?.text ?: "")
         }
 
@@ -211,26 +307,25 @@ class CheckListActivity : AppCompatActivity() {
                 lifecycleScope.launch {
                     withContext(Dispatchers.IO) {
                         if (text.isEmpty()) {
-                            notesDao.delete(keyId, pos)
-                            LogBus.noteDelete(keyId, pos, bl)   // ★ 삭제 로그
+                            notesDao.deleteByBl(keyId, bl)          // ✅ BL로 삭제
+                            LogBus.noteDelete(keyId, pos, bl)
                         } else {
                             notesDao.upsert(
                                 Note(
                                     fileKey = keyId,
-                                    rowIndex = pos,
-                                    bl = bl,
+                                    rowIndex = pos,                    // (레거시 호환용)
+                                    bl = bl,                           // ✅ 핵심
                                     text = text,
                                     updatedTs = System.currentTimeMillis()
                                 )
                             )
-                            LogBus.noteAdd(keyId, pos, bl, text)   // ★ 추가/수정 로그
+                            LogBus.noteAdd(keyId, pos, bl, text)
                         }
                     }
-                    if (text.isEmpty()) noted.remove(pos) else noted.add(pos)
-                    adapter.setNotedPositions(noted)
+                    if (text.isEmpty()) notedBLs.remove(bl) else notedBLs.add(bl)
+                    adapter.setNotedBLs(notedBLs)                     // ✅ 표시 갱신
                 }
             }
-
             .show()
     }
     // =================================
@@ -392,7 +487,15 @@ class CheckListActivity : AppCompatActivity() {
             SortKey.NO -> "No"; SortKey.BL -> "B/L"; SortKey.HAJU -> "화주"; SortKey.CAR -> "차량정보"
             SortKey.QTY -> "수"; SortKey.CLEAR -> "면장"; SortKey.CHECK -> "확인"; else -> ""
         }
-        val items = listOfNotNull(hdrNo?.let { it to SortKey.NO }, hdrBL to SortKey.BL, hdrHaju to SortKey.HAJU, hdrCar to SortKey.CAR, hdrQty to SortKey.QTY, hdrClear to SortKey.CLEAR, hdrCheck to SortKey.CHECK)
+        val items = listOfNotNull(
+            hdrNo?.let { it to SortKey.NO },
+            hdrBL to SortKey.BL,
+            hdrHaju to SortKey.HAJU,
+            hdrCar to SortKey.CAR,
+            hdrQty to SortKey.QTY,
+            hdrClear to SortKey.CLEAR,
+            hdrCheck to SortKey.CHECK
+        )
         items.forEach { (tv, key) ->
             val base = baseText(key)
             tv.text = if (sortKey == key) { if (sortAsc) "$base ▲" else "$base ▼" } else base
@@ -513,7 +616,7 @@ class CheckListActivity : AppCompatActivity() {
         if (query.isEmpty()) {
             rows = allRows.toMutableList()
             adapter.updateData(rows)
-            adapter.setNotedPositions(noted) // 표시 유지
+            adapter.setNotedBLs(notedBLs) // ✅ 표시 유지(B/L 기준)
             updateStatus()
             return
         }
@@ -529,9 +632,7 @@ class CheckListActivity : AppCompatActivity() {
             if (hit) buffer += r
         }
         flush(); rows = result; adapter.updateData(rows)
-        // 간단 표시: 현재 rows 인덱스 기준으로도 noted와 교집합만 표시 (필요 시 고도화)
-        val filteredNoted = noted.filter { it in rows.indices }.toSet()
-        adapter.setNotedPositions(filteredNoted)
+        adapter.setNotedBLs(notedBLs) // ✅ 필터 후에도 BL 집합만 주면 알아서 맞는 행에 표시
         updateStatus()
     }
 
