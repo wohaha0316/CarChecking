@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="8dp">
+
+    <!-- 1줄: '제원정리 표' / '설정' -->
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="48dp">
+
+        <Button
+            android:id="@+id/btnSpecCrud"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="제원정리 표"
+            android:textAllCaps="false"/>
+
+        <Space
+            android:layout_width="8dp"
+            android:layout_height="match_parent"/>
+
+        <Button
+            android:id="@+id/btnSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="설정"
+            android:textAllCaps="false"/>
+    </LinearLayout>
+
+    <!-- 2줄: 상태(전체/면장X/확인/선적) -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="start|center_vertical"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:paddingHorizontal="8dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"/>
+
+    <!-- 3줄: 요약 테이블 -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <TableLayout
+            android:id="@+id/tableLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:shrinkColumns="1,2,3,4"
+            android:stretchColumns="0,1,2,3,4"/>
+    </ScrollView>
+
+</LinearLayout>

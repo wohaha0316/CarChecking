@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <!-- 1줄: 파일명 / 로그 / 닫기 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="3"
+        android:paddingBottom="8dp">
+
+        <Button
+            android:id="@+id/btnFileName"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="엑셀명" />
+
+        <Button
+            android:id="@+id/btnLogs"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="로그" />
+
+        <Button
+            android:id="@+id/btnClose"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="닫기" />
+    </LinearLayout>
+
+    <!-- 2줄: 현황 카운트 버튼 -->
+    <Button
+        android:id="@+id/btnStatus"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:text="현황(미계산)"
+        android:textStyle="bold"
+        android:padding="8dp" />
+
+    <!-- 간격 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="8dp" />
+
+    <!-- 3줄: 선적체크 / 차체크 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2">
+
+        <Button
+            android:id="@+id/btnShipping"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="선적체크" />
+
+        <Button
+            android:id="@+id/btnChecking"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="차체크" />
+    </LinearLayout>
+
+    <!-- 하단: 파일 경로(선택 표시) -->
+    <TextView
+        android:id="@+id/tvPath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="12dp"
+        android:textColor="#888888"
+        android:textSize="12sp" />
+
+</LinearLayout>

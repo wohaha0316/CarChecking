@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -30,10 +31,13 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import java.io.File
 import java.io.FileInputStream
 import java.util.Locale
+import kotlin.math.max
 
 class CheckListActivity : AppCompatActivity() {
 
-    // 기본 엑셀 추정 위치
+    companion object { const val ACTION_UPDATE_HOME_STATUS = "com.example.carchecking.UPDATE_HOME_STATUS" }
+
+    // 엑셀 컬럼 추정
     private val DEF_BL = 1
     private val DEF_HAJU = 2
     private val DEF_CAR = 3
@@ -46,25 +50,25 @@ class CheckListActivity : AppCompatActivity() {
     private lateinit var progress: ProgressBar
 
     private lateinit var adapter: CheckRowAdapter
-    private var allRows: MutableList<CheckRow> = mutableListOf()
-    internal var rows: MutableList<CheckRow> = mutableListOf()
-    internal var orderCounter = 0
+    private var allRows: MutableList<CheckRow> = mutableListOf() // 전역(전체)
+    internal var rows: MutableList<CheckRow> = mutableListOf()   // 화면(필터)
 
     private val PREF_NAME = "carchecking_prefs"
-
     private lateinit var currentFile: File
     private lateinit var keyId: String
-
     private lateinit var uiConfig: UiConfig
     private lateinit var eventRepo: EventRepository
 
-    // ======== 특이사항 메모용 ========
+    // 전역 저장소
+    private lateinit var prefs: SharedPreferences
+    private lateinit var orderStore: CheckOrderStore
+
+    // 메모
     private lateinit var db: AppDatabase
     private lateinit var notesDao: NoteDao
-    /** ✅ 메모 표시를 B/L 기준으로 관리 */
     private val notedBLs = mutableSetOf<String>()
-    // ==============================
 
+    // 정렬
     private var sortKey: SortKey = SortKey.NONE
     private var sortAsc: Boolean = true
     private enum class SortKey { NONE, NO, BL, HAJU, CAR, QTY, CLEAR, CHECK }
@@ -73,18 +77,17 @@ class CheckListActivity : AppCompatActivity() {
     private var searchEdit: EditText? = null
     private var rowDivider: RecyclerView.ItemDecoration? = null
 
-    // ===== 스캐너 호출/결과 =====
+    // 스캐너
     private val vinScanLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
         if (res.resultCode == RESULT_OK) {
             val vin = res.data?.getStringExtra("vin")?.let(VinUtils::normalize) ?: return@registerForActivityResult
-            showVinConfirmDialog(vin) // ★ 스캔 즉시 확인창
+            showVinConfirmDialog(vin)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_check_list)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -92,103 +95,232 @@ class CheckListActivity : AppCompatActivity() {
         recycler = findViewById(R.id.recyclerViewCheck)
         tvStatus = findViewById(R.id.tvStatus)
         progress = findViewById(R.id.progress)
-
         recycler.layoutManager = LinearLayoutManager(this)
         recycler.setHasFixedSize(true)
 
         val path = intent.getStringExtra("filePath")
         if (path.isNullOrBlank()) { Toast.makeText(this, "파일 경로 없음", Toast.LENGTH_SHORT).show(); finish(); return }
-
         currentFile = File(path)
         keyId = ParsedCache.keyFor(currentFile).id()
-        uiConfig = UiPrefs.load(this, keyId)
-        uiConfig.rowSpacing = 0f
+
+        uiConfig = UiPrefs.load(this, keyId).also { it.rowSpacing = 0f }
         eventRepo = EventRepository(this)
 
-        // DB 준비
         db = AppDatabase.get(this)
         notesDao = db.notes()
+
+        prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+        orderStore = CheckOrderStore(prefs, keyId)
 
         showLoading(true)
         lifecycleScope.launch {
             val cacheKey = ParsedCache.keyFor(currentFile)
             val cached = withContext(Dispatchers.IO) { ParsedCache.read(filesDir, cacheKey) }
-
-            val parsed = if (cached != null && cached.isNotEmpty()) cached.toMutableList()
-            else {
+            val parsed = if (!cached.isNullOrEmpty()) cached.toMutableList() else {
                 val p = withContext(Dispatchers.IO) { readExcel(currentFile) }.toMutableList()
                 withContext(Dispatchers.IO) { ParsedCache.write(filesDir, cacheKey, p) }
                 p
             }
 
-            allRows = parsed; rows = parsed.toMutableList()
+            allRows = parsed
+            rows = parsed.toMutableList()
 
             adapter = CheckRowAdapter(
                 rows, uiConfig,
                 onToggle = { position, nowChecked -> onRowToggled(position, nowChecked) }
-            ).also { ad ->
-                // 롱프레스 → 특이사항 다이얼로그
-                ad.onRowLongPress = { pos, bl -> showNoteDialog(pos, bl) }
-            }
+            ).also { ad -> ad.onRowLongPress = { pos, bl -> showNoteDialog(pos, bl) } }
             recycler.adapter = adapter
 
-            // 파일에 저장된 메모 로드 → 표시
-            loadNotesAndMark()
+            VinIndexManager.indexFile(keyId, currentFile.absolutePath, allRows)
 
+            loadNotesAndMark()
             applyUiToHeader(uiConfig)
             applyDivider(uiConfig.showRowDividers)
+            restoreCheckState()                  // 저장된 체크/순번 반영
+            updateStatus()                       // 전역 기준 현황
 
-            findViewById<Button?>(R.id.btnSort)?.apply {
-                text = "설정"
-                setOnClickListener {
-                    SettingsBottomSheet(
-                        context = this@CheckListActivity,
-                        initial = uiConfig.copy(),
-                        onApply = { cfg, scope ->
-                            UiPrefs.save(this@CheckListActivity, scope, if (scope==UiPrefs.Scope.FILE) keyId else null, cfg)
-                            uiConfig = UiPrefs.load(this@CheckListActivity, keyId)
-                            applyUiToHeader(uiConfig); adapter.updateUi(uiConfig); applyDivider(uiConfig.showRowDividers)
-                        },
-                        onLiveChange = { cfg ->
-                            applyUiToHeader(cfg); adapter.updateUi(cfg); applyDivider(cfg.showRowDividers)
-                        },
-                        onResetToDefault = { def ->
-                            applyUiToHeader(def); adapter.updateUi(def); applyDivider(def.showRowDividers)
-                        }
-                    ).show()
-                }
-            }
-            findViewById<Button?>(R.id.btnSearch)?.apply { text = "찾기"; setOnClickListener { toggleSearchBar() } }
-
-            // ▼▼ 카메라 버튼: 스캐너 실행 연결
-            findViewById<Button?>(R.id.btnCamera)?.apply {
-                text = "카메라"
-                setOnClickListener { openVinScanner() }
-            }
-
-            // ---- VIN 인덱싱: 현재 파일을 세션 전역 인덱스에 등록
-            VinIndexManager.indexFile(
-                fileKey = keyId,
-                filePath = currentFile.absolutePath,
-                rows = allRows
-            )
-
-            restoreCheckState()
-            updateStatus()
             attachHeaderSort()
             showLoading(false)
         }
+
+        findViewById<Button?>(R.id.btnSearch)?.apply { text = "찾기"; setOnClickListener { toggleSearchBar() } }
+        findViewById<Button?>(R.id.btnSort)?.apply {
+            text = "설정"
+            setOnClickListener {
+                SettingsBottomSheet(
+                    context = this@CheckListActivity,
+                    initial = uiConfig.copy(),
+                    onApply = { cfg, scope ->
+                        UiPrefs.save(this@CheckListActivity, scope, if (scope == UiPrefs.Scope.FILE) keyId else null, cfg)
+                        uiConfig = UiPrefs.load(this@CheckListActivity, keyId)
+                        applyUiToHeader(uiConfig); adapter.updateUi(uiConfig); applyDivider(cfg.showRowDividers)
+                    },
+                    onLiveChange = { cfg -> applyUiToHeader(cfg); adapter.updateUi(cfg); applyDivider(cfg.showRowDividers) },
+                    onResetToDefault = { def -> applyUiToHeader(def); adapter.updateUi(def); applyDivider(def.showRowDividers) }
+                ).show()
+            }
+        }
+        findViewById<Button?>(R.id.btnCamera)?.apply { text = "카메라"; setOnClickListener { openVinScanner() } }
+    }
+    /** Prefs → allRows 최신화 (필터/화면 전환 뒤 상태 어긋남 방지) */
+
+    /** 전역 기준 다음 순번 계산: 메모리 vs Prefs 중 더 큰 값 + 1 */
+    private fun nextGlobalOrder(): Int {
+        val maxInMem   = allRows.maxOfOrNull { it.checkOrder } ?: 0
+        val maxInPrefs = orderStore.maxOrderInPrefs()
+        return kotlin.math.max(maxInMem, maxInPrefs) + 1
     }
 
-    // 스캐너 열기
-    private fun openVinScanner() {
-        vinScanLauncher.launch(Intent(this, ScanVinActivity::class.java))
+    /**
+     * ✅ Prefs → 메모리(allRows) 동기화
+     *   - 토글 직전에 호출해서, '전역 최대 순번' 계산이 항상 최신이 되도록 보장
+     */
+    private fun syncOrdersFromPrefs() {
+        val id = keyId
+        val p = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+        allRows.forEachIndexed { idx, r ->
+            if (!r.isLabelRow) {
+                val base = "check_orders:$id:$idx"
+                r.isChecked  = p.getBoolean("${base}_checked", false)
+                r.checkOrder = p.getInt("${base}_order", 0)
+            }
+        }
+    }
+    /** 전역에서 현재 체크된 개수 (라벨 제외) */
+    private fun countCheckedGlobal(): Int =
+        allRows.count { !it.isLabelRow && it.checkOrder > 0 }
+
+    /** 체크 해제 시: 제거된 순번보다 큰 모든 항목을 1씩 당겨서 1..K 연속성 유지 */
+    private fun compactAfterUncheck(removedOrder: Int) {
+        if (removedOrder <= 0) return
+        allRows.forEachIndexed { idx, r ->
+            if (!r.isLabelRow && r.checkOrder > removedOrder) {
+                r.checkOrder -= 1
+                // 체크 상태는 유지, Prefs도 동기화
+                orderStore.write(idx, r.isChecked, r.checkOrder)
+            }
+        }
     }
 
-    // ★ 스캔 확인 다이얼로그 (복사/확인/취소)
+    /** 확인 해제 재확인 다이얼로그 */
+    private fun confirmUncheck(row: CheckRow, position: Int, globalIdx: Int) {
+        AlertDialog.Builder(this)
+            .setTitle("확인 취소")
+            .setMessage("${row.bl}\n확인 취소하시겠습니까?")
+            .setNegativeButton("아니오") { _, _ ->
+                // 취소: 원래 상태로 되돌림 (체크 유지)
+                row.isChecked = true
+                adapter.notifyItemChanged(position)
+            }
+            .setPositiveButton("예") { _, _ ->
+                // 실제 해제 처리
+                val removed = row.checkOrder
+                row.isChecked  = false
+                row.checkOrder = 0
+                orderStore.write(globalIdx, false, 0)
+
+                // 뒤 번호들 1씩 당겨서 1..K 유지
+                compactAfterUncheck(removed)
+
+                adapter.notifyDataSetChanged()
+                Toast.makeText(this, "확인 해제", Toast.LENGTH_SHORT).show()
+
+                // 로그 & 현황 갱신
+                val user = getSharedPreferences("user_profile", MODE_PRIVATE)
+                    .getString("checker_name", null)
+                lifecycleScope.launch {
+                    eventRepo.logCheck(fileKey = keyId, rowIndex = globalIdx, checked = false, user = user)
+                    updateStatus()
+                    pushStatusToHomeAndBroadcast()
+                }
+            }
+            .show()
+    }
+
+
+    // ===== 확인 토글(전역, 필터 무관) =====
+    // ===== 확인 토글(전역, 필터 무관) =====
+    // ===== 확인 토글(전역, 필터 무관) =====
+    fun onRowToggled(position: Int, nowChecked: Boolean) {
+        val row = rows.getOrNull(position) ?: return
+        if (row.isLabelRow) return
+
+        // 화면 인덱스 → 전역 인덱스
+        val globalIdx = allRows.indexOf(row)
+        if (globalIdx < 0) return
+
+        // 전역 상태 최신화 (필수)
+        syncOrdersFromPrefs()
+
+        if (nowChecked) {
+            // 체크: 번호 없으면 전역 개수+1 부여
+            if (row.checkOrder == 0) {
+                val next = countCheckedGlobal() + 1
+                row.isChecked  = true
+                row.checkOrder = next
+                orderStore.write(globalIdx, true, next)
+            } else {
+                row.isChecked = true
+                orderStore.write(globalIdx, true, row.checkOrder)
+            }
+            adapter.notifyItemChanged(position)
+            Toast.makeText(this, "확인 #${row.checkOrder}", Toast.LENGTH_SHORT).show()
+
+            // 로그 & 현황 갱신
+            val user = getSharedPreferences("user_profile", MODE_PRIVATE)
+                .getString("checker_name", null)
+            lifecycleScope.launch {
+                eventRepo.logCheck(fileKey = keyId, rowIndex = globalIdx, checked = true, user = user)
+                updateStatus()
+                pushStatusToHomeAndBroadcast()
+            }
+        } else {
+            // ✅ 체크 해제 시: 즉시 해제하지 말고 '확인 취소하시겠습니까?' 팝업
+            // row.isChecked는 UI 토글 반영으로 false일 수 있으니, 팝업에서 '아니오'면 true로 되돌려줌
+            confirmUncheck(row, position, globalIdx)
+        }
+    }
+
+
+
+
+    // ===== 현황표(전역 기준) =====
+    private fun readShipStateGlobal(idx: Int): Boolean =
+        getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+            .getBoolean("ship_orders:${keyId}:${idx}_shipped", false)
+
+    fun updateStatus() {
+        val totalCars  = allRows.count { !it.isLabelRow && it.bl.isNotBlank() }
+        val clearanceX = allRows.filter { !it.isLabelRow }.count { it.clearance.equals("X", true) }
+        val checked    = allRows.count { it.isChecked }
+        val shipped    = allRows.indices.count { !allRows[it].isLabelRow && readShipStateGlobal(it) }
+
+        val statusHtml = "전체 <font color='#000000'>${totalCars} 대</font>  " +
+                "면장X <font color='#CC0000'>${clearanceX} 대</font>  " +
+                "확인 <font color='#1E90FF'>${checked} 대</font>  " +
+                "선적 <font color='#008000'>${shipped} 대</font>"
+        tvStatus.text = fromHtmlCompat(statusHtml)
+
+        val p = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
+        val base = "status:${keyId}"
+        p.putInt("$base:total", totalCars)
+        p.putInt("$base:clearanceX", clearanceX)
+        p.putInt("$base:checked", checked)
+        p.putInt("$base:shipped", shipped)
+        p.putString("$base:html", statusHtml)
+        p.apply()
+    }
+
+    private fun pushStatusToHomeAndBroadcast() {
+        val intent = Intent(ACTION_UPDATE_HOME_STATUS).putExtra("fileKey", keyId)
+        sendBroadcast(intent)
+    }
+
+    // ===== 스캐너/다이얼로그 =====
+    private fun openVinScanner() { vinScanLauncher.launch(Intent(this, ScanVinActivity::class.java)) }
+
     private fun showVinConfirmDialog(vin: String) {
-        LogBus.logRaw("[차대번호 $vin] 스캔")   // 무조건 로그 남김
-
+        LogBus.logRaw("[차대번호 $vin] 스캔")
         AlertDialog.Builder(this)
             .setTitle("스캔된 VIN 확인")
             .setMessage(vin)
@@ -202,9 +334,7 @@ class CheckListActivity : AppCompatActivity() {
             .show()
     }
 
-    // 스캔 결과 처리: 현재 파일 → 세션 내 다른 파일 순서로 매칭
     private fun handleScannedVin(vin: String) {
-        // 1) 현재 파일에서 매칭
         val hitNow = VinIndexManager.findInCurrent(keyId, vin)
         if (hitNow != null) {
             smoothScrollAndBlink(hitNow.rowIndex)
@@ -212,8 +342,6 @@ class CheckListActivity : AppCompatActivity() {
             LogBus.logRaw("VIN 매칭(현재): $vin -> ${hitNow.bl}")
             return
         }
-
-        // 2) 세션 내 다른 파일에서 매칭
         val hits = VinIndexManager.findInOthers(keyId, vin)
         if (hits.isNotEmpty()) {
             val top = hits.first()
@@ -221,7 +349,8 @@ class CheckListActivity : AppCompatActivity() {
                 .setTitle("다른 리스트에서 발견")
                 .setMessage("${File(top.filePath).name}\nB/L: ${top.bl}\n해당 파일을 열고 이동할까요?")
                 .setNegativeButton("취소", null)
-                .setPositiveButton("열기") { _, _ ->
+                .setPositiveButton("열기") {
+                        _, _ ->
                     LogBus.logRaw("VIN 교차매칭: $vin -> ${File(top.filePath).name} / ${top.bl}")
                     val i = Intent(this, CheckListActivity::class.java)
                     i.putExtra("filePath", top.filePath)
@@ -230,13 +359,10 @@ class CheckListActivity : AppCompatActivity() {
                 .show()
             return
         }
-
-        // 3) 어디에도 없음 (다음 단계: 선입고 저장 예정)
         Toast.makeText(this, "어느 리스트에도 없음 (선입고는 다음 단계에서)", Toast.LENGTH_SHORT).show()
         LogBus.logRaw("VIN 미매칭: $vin")
     }
 
-    // 간단 하이라이트(깜빡임)
     private fun smoothScrollAndBlink(rowIndex: Int) {
         recycler.smoothScrollToPosition(rowIndex)
         recycler.postDelayed({
@@ -248,7 +374,35 @@ class CheckListActivity : AppCompatActivity() {
         }, 300)
     }
 
-    // ✅ 특이사항: DB에서 불러와 어댑터에 BL기반 표시
+    // ===== 메모 =====
+    private fun showNoteDialog(pos: Int, bl: String) {
+        val ctx = this
+        val et = EditText(ctx).apply { setLines(4); gravity = Gravity.TOP; hint = "특이사항 메모 (비우면 삭제)" }
+        lifecycleScope.launch {
+            val existing = withContext(Dispatchers.IO) { notesDao.getByBl(keyId, bl) }
+            et.setText(existing?.text ?: "")
+        }
+        AlertDialog.Builder(ctx)
+            .setTitle("특이사항 - $bl")
+            .setView(et)
+            .setNegativeButton("취소", null)
+            .setPositiveButton("완료") { _, _ ->
+                val text = et.text?.toString()?.trim().orEmpty()
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        if (text.isEmpty()) { notesDao.deleteByBl(keyId, bl); LogBus.noteDelete(keyId, pos, bl) }
+                        else {
+                            notesDao.upsert(Note(fileKey = keyId, rowIndex = pos, bl = bl, text = text, updatedTs = System.currentTimeMillis()))
+                            LogBus.noteAdd(keyId, pos, bl, text)
+                        }
+                    }
+                    if (text.isEmpty()) notedBLs.remove(bl) else notedBLs.add(bl)
+                    adapter.setNotedBLs(notedBLs)
+                }
+            }
+            .show()
+    }
+
     private fun loadNotesAndMark() {
         lifecycleScope.launch {
             val list = withContext(Dispatchers.IO) { notesDao.listByFile(keyId) }
@@ -258,169 +412,7 @@ class CheckListActivity : AppCompatActivity() {
         }
     }
 
-    // 체크/해제 시 DB 이벤트 기록
-    fun onRowToggled(position: Int, nowChecked: Boolean) {
-        val user = getSharedPreferences("user_profile", MODE_PRIVATE).getString("checker_name", null)
-        lifecycleScope.launch {
-            eventRepo.logCheck(
-                fileKey = keyId,
-                rowIndex = position, // 라벨 포함 화면 인덱스 기준
-                checked = nowChecked,
-                user = user
-            )
-            updateStatus()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (this::adapter.isInitialized) updateStatus()
-        LogBus.appOpen("차체크화면")
-    }
-    override fun onPause() {
-        super.onPause()
-        saveCheckState()
-        LogBus.appClose("차체크화면")
-    }
-
-    // ===== 특이사항 메모 다이얼로그 =====
-    private fun showNoteDialog(pos: Int, bl: String) {
-        val ctx = this
-        val et = EditText(ctx).apply {
-            setLines(4)
-            gravity = Gravity.TOP
-            hint = "특이사항 메모를 입력하세요 (비워두면 삭제)"
-        }
-
-        // 기존 메모 로딩 (✅ BL 기준)
-        lifecycleScope.launch {
-            val existing = withContext(Dispatchers.IO) { notesDao.getByBl(keyId, bl) }
-            et.setText(existing?.text ?: "")
-        }
-
-        AlertDialog.Builder(ctx)
-            .setTitle("특이사항 - $bl")
-            .setView(et)
-            .setNegativeButton("취소", null)
-            .setPositiveButton("완료") { _, _ ->
-                val text = et.text?.toString()?.trim().orEmpty()
-                lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        if (text.isEmpty()) {
-                            notesDao.deleteByBl(keyId, bl)          // ✅ BL로 삭제
-                            LogBus.noteDelete(keyId, pos, bl)
-                        } else {
-                            notesDao.upsert(
-                                Note(
-                                    fileKey = keyId,
-                                    rowIndex = pos,                    // (레거시 호환용)
-                                    bl = bl,                           // ✅ 핵심
-                                    text = text,
-                                    updatedTs = System.currentTimeMillis()
-                                )
-                            )
-                            LogBus.noteAdd(keyId, pos, bl, text)
-                        }
-                    }
-                    if (text.isEmpty()) notedBLs.remove(bl) else notedBLs.add(bl)
-                    adapter.setNotedBLs(notedBLs)                     // ✅ 표시 갱신
-                }
-            }
-            .show()
-    }
-    // =================================
-
-    private fun showLoading(show: Boolean) {
-        progress.visibility = if (show) View.VISIBLE else View.GONE
-        recycler.visibility = if (show) View.INVISIBLE else View.VISIBLE
-    }
-
-    private fun applyDivider(show: Boolean) {
-        rowDivider?.let { recycler.removeItemDecoration(it); rowDivider = null }
-        if (show) { rowDivider = DividerItemDecoration(this, LinearLayoutManager.VERTICAL); recycler.addItemDecoration(rowDivider!!) }
-    }
-
-    // ---- 엑셀 파싱(기존 로직 유지) ----
-    private fun readExcel(file: File): List<CheckRow> {
-        val out = mutableListOf<CheckRow>()
-        try {
-            FileInputStream(file).use { fis ->
-                val wb = if (file.name.endsWith(".xls", true)) HSSFWorkbook(fis) else XSSFWorkbook(fis)
-                val sheet = wb.getSheetAt(0); val fmt = DataFormatter()
-                for (r in DEF_DATA_START..sheet.lastRowNum) {
-                    val row = sheet.getRow(r) ?: continue
-                    val bl = getRaw(fmt, row, DEF_BL).trim()
-                    val haju = getRaw(fmt, row, DEF_HAJU).trim()
-                    val descRaw = getRaw(fmt, row, DEF_CAR)
-                    val qty = getRaw(fmt, row, DEF_QTY).trim()
-                    val clearance = getRaw(fmt, row, DEF_CLEAR).trim()
-                    if (bl.isEmpty() && haju.isEmpty() && descRaw.isEmpty() && qty.isEmpty() && clearance.isEmpty()) continue
-                    if (bl.startsWith("TERMINAL", true)) { out.add(CheckRow(bl, "", "", "", "", isLabelRow = true)); continue }
-                    val carInfo = cleanMultiline(descRaw)
-                    out.add(CheckRow(bl, haju, carInfo, qty, clearance))
-                }
-                wb.close()
-            }
-        } catch (e: Exception) { e.printStackTrace() }
-        return out
-    }
-
-    private fun getRaw(fmt: DataFormatter, row: org.apache.poi.ss.usermodel.Row, idx: Int): String {
-        val c = row.getCell(idx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL) ?: return ""
-        return fmt.formatCellValue(c)
-    }
-
-    private fun cleanMultiline(src: String): String {
-        val normalized = src.replace("\r\n", "\n").replace('\r', '\n')
-        val specialSpaces = Regex("[\\u00A0\\u2007\\u202F\\u200B\\t]")
-        return normalized.trim('\n', ' ', '\t', '\r')
-            .split('\n').map { it.replace(specialSpaces, " ").trim() }
-            .filter { it.isNotEmpty() && !it.equals("USED CAR", true) }
-            .joinToString("\n")
-    }
-
-    private fun formatStatusHtml(total: Int, clearanceX: Int, checked: Int, shipped: Int) =
-        "전체 <font color='#000000'>${total} 대</font>  " +
-                "면장X <font color='#CC0000'>${clearanceX} 대</font>  " +
-                "확인 <font color='#1E90FF'>${checked} 대</font>  " +
-                "선적 <font color='#008000'>${shipped} 대</font>"
-
-    fun updateStatus() {
-        val totalCars = rows.count { !it.isLabelRow && it.bl.isNotBlank() }
-        val clearanceX = rows.filter { !it.isLabelRow }.count { it.clearance.equals("X", true) }
-        val checked = rows.count { it.isChecked }
-        val shipped = rows.indices.count { !rows[it].isLabelRow && readShipState(it) }
-
-        val statusHtml = formatStatusHtml(totalCars, clearanceX, checked, shipped)
-        tvStatus.text = fromHtmlCompat(statusHtml)
-
-        val p = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
-        val baseNew = "status:${ParsedCache.keyFor(currentFile).id()}"
-        p.putInt("$baseNew:total", totalCars)
-        p.putInt("$baseNew:clearanceX", clearanceX)
-        p.putInt("$baseNew:checked", checked)
-        p.putInt("$baseNew:shipped", shipped)
-        p.putString("$baseNew:html", statusHtml)
-        p.apply()
-    }
-
-    private fun readShipState(idx: Int): Boolean =
-        getSharedPreferences(PREF_NAME, MODE_PRIVATE)
-            .getBoolean("ship_orders:${keyId}:${idx}_shipped", false)
-
-    private fun saveCheckState() {
-        val e = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
-        allRows.forEachIndexed { idx, r ->
-            if (!r.isLabelRow) {
-                val base = "check_orders:${ParsedCache.keyFor(currentFile).id()}:$idx"
-                e.putBoolean("${base}_checked", r.isChecked)
-                e.putInt("${base}_order", r.checkOrder)
-            }
-        }
-        e.putInt("check_orders:${ParsedCache.keyFor(currentFile).id()}:orderCounter", orderCounter)
-        e.apply()
-    }
-
+    // ===== 상태 저장/복원/정렬 =====
     private fun restoreCheckState() {
         val id = ParsedCache.keyFor(currentFile).id()
         val p = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
@@ -431,38 +423,15 @@ class CheckListActivity : AppCompatActivity() {
                 r.checkOrder = p.getInt("${base}_order", 0)
             }
         }
-        orderCounter = p.getInt("check_orders:$id:orderCounter", 0)
         if (this::adapter.isInitialized) adapter.updateData(rows)
     }
 
-    fun reindexOrders() {
-        var next = 1
-        allRows.filter { it.isChecked }.sortedBy { it.checkOrder }.forEach { it.checkOrder = next++ }
-        orderCounter = allRows.count { it.isChecked }
-        adapter.updateData(rows); updateStatus(); saveCheckState()
-    }
-
-    private fun applyUiToHeader(cfgRaw: UiConfig) {
-        val cfg = cfgRaw.normalized()
-        fun setW(id: Int, w: Float) {
-            val tv = findViewById<TextView?>(id) ?: return
-            (tv.layoutParams as? LinearLayout.LayoutParams)?.let { it.weight = w; tv.layoutParams = it }
-        }
-        setW(R.id.tvNoHeader, cfg.wNo)
-        setW(R.id.tvBLHeader, cfg.wBL)
-        setW(R.id.tvHajuHeader, cfg.wHaju)
-        setW(R.id.tvCarInfoHeader, cfg.wCar)
-        setW(R.id.tvQtyHeader, cfg.wQty)
-        setW(R.id.tvClearHeader, cfg.wClear)
-        setW(R.id.tvCheckHeader, cfg.wCheck)
-    }
-
     private fun attachHeaderSort() {
-        val hdrNo = findViewById<TextView?>(R.id.tvNoHeader)
-        val hdrBL = findViewById<TextView>(R.id.tvBLHeader)
-        val hdrHaju = findViewById<TextView>(R.id.tvHajuHeader)
-        val hdrCar = findViewById<TextView>(R.id.tvCarInfoHeader)
-        val hdrQty = findViewById<TextView>(R.id.tvQtyHeader)
+        val hdrNo    = findViewById<TextView?>(R.id.tvNoHeader)
+        val hdrBL    = findViewById<TextView>(R.id.tvBLHeader)
+        val hdrHaju  = findViewById<TextView>(R.id.tvHajuHeader)
+        val hdrCar   = findViewById<TextView>(R.id.tvCarInfoHeader)
+        val hdrQty   = findViewById<TextView>(R.id.tvQtyHeader)
         val hdrClear = findViewById<TextView>(R.id.tvClearHeader)
         val hdrCheck = findViewById<TextView>(R.id.tvCheckHeader)
 
@@ -470,6 +439,7 @@ class CheckListActivity : AppCompatActivity() {
             if (sortKey == key) sortAsc = !sortAsc else { sortKey = key; sortAsc = true }
             sortInBlocks()
             setHeaderIndicators(hdrNo, hdrBL, hdrHaju, hdrCar, hdrQty, hdrClear, hdrCheck)
+            saveLastViewState()
         }
         hdrNo?.setOnClickListener   { toggle(SortKey.NO) }
         hdrBL.setOnClickListener    { toggle(SortKey.BL) }
@@ -478,7 +448,6 @@ class CheckListActivity : AppCompatActivity() {
         hdrQty.setOnClickListener   { toggle(SortKey.QTY) }
         hdrClear.setOnClickListener { toggle(SortKey.CLEAR) }
         hdrCheck.setOnClickListener { toggle(SortKey.CHECK) }
-
         setHeaderIndicators(hdrNo, hdrBL, hdrHaju, hdrCar, hdrQty, hdrClear, hdrCheck)
     }
 
@@ -500,18 +469,6 @@ class CheckListActivity : AppCompatActivity() {
             val base = baseText(key)
             tv.text = if (sortKey == key) { if (sortAsc) "$base ▲" else "$base ▼" } else base
         }
-    }
-
-    private fun sortInBlocks() {
-        if (!this::adapter.isInitialized) return
-        val labelIdx = rows.mapIndexedNotNull { idx, r -> if (r.isLabelRow) idx else null }
-        val cuts = mutableListOf(-1); cuts.addAll(labelIdx); cuts.add(rows.size)
-        for (i in 0 until cuts.size - 1) {
-            val start = cuts[i] + 1; val endEx = cuts[i + 1]; if (start >= endEx) continue
-            val block = rows.subList(start, endEx)
-            block.sortWith(compareFor(sortKey, sortAsc))
-        }
-        adapter.updateData(rows); adapter.notifyDataSetChanged()
     }
 
     private fun compareFor(key: SortKey, asc: Boolean): Comparator<CheckRow> {
@@ -536,7 +493,19 @@ class CheckListActivity : AppCompatActivity() {
         }
     }
 
-    // ---- 찾기바 (기존) ----
+    private fun sortInBlocks() {
+        if (!this::adapter.isInitialized) return
+        val labelIdx = rows.mapIndexedNotNull { idx, r -> if (r.isLabelRow) idx else null }
+        val cuts = mutableListOf(-1); cuts.addAll(labelIdx); cuts.add(rows.size)
+        for (i in 0 until cuts.size - 1) {
+            val start = cuts[i] + 1; val endEx = cuts[i + 1]; if (start >= endEx) continue
+            val block = rows.subList(start, endEx)
+            block.sortWith(compareFor(sortKey, sortAsc))
+        }
+        adapter.updateData(rows); adapter.notifyDataSetChanged()
+    }
+
+    // ===== 검색바/필터 =====
     private fun toggleSearchBar() {
         if (searchBar == null) createSearchBar()
         if (searchBar!!.visibility == View.VISIBLE) {
@@ -556,7 +525,10 @@ class CheckListActivity : AppCompatActivity() {
         }
         if (alsoClearInput) searchEdit?.setText("")
         searchBar?.visibility = View.GONE
-        if (resetFilter) applyFilter(null)
+        if (resetFilter) {
+            applyFilter(null)
+            saveLastViewState()
+        }
     }
     private fun createSearchBar() {
         val root = findViewById<ViewGroup>(android.R.id.content)
@@ -605,7 +577,10 @@ class CheckListActivity : AppCompatActivity() {
 
         et.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { applyFilter(s?.toString()) }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                applyFilter(s?.toString())
+                saveLastViewState()
+            }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
 
@@ -616,7 +591,8 @@ class CheckListActivity : AppCompatActivity() {
         if (query.isEmpty()) {
             rows = allRows.toMutableList()
             adapter.updateData(rows)
-            adapter.setNotedBLs(notedBLs) // ✅ 표시 유지(B/L 기준)
+            adapter.setNotedBLs(notedBLs)
+            sortInBlocks()
             updateStatus()
             return
         }
@@ -632,9 +608,150 @@ class CheckListActivity : AppCompatActivity() {
             if (hit) buffer += r
         }
         flush(); rows = result; adapter.updateData(rows)
-        adapter.setNotedBLs(notedBLs) // ✅ 필터 후에도 BL 집합만 주면 알아서 맞는 행에 표시
+        adapter.setNotedBLs(notedBLs)
+        sortInBlocks()
         updateStatus()
     }
 
+    // ===== 마지막 화면 상태 저장/복원 =====
+    private fun saveLastViewState() {
+        val lm = recycler.layoutManager as? LinearLayoutManager
+        val first = lm?.findFirstVisibleItemPosition() ?: 0
+        val topOffset = if (recycler.childCount > 0) recycler.getChildAt(0)?.top ?: 0 else 0
+        val q = searchEdit?.text?.toString().orEmpty()
+
+        val base = "viewstate:${keyId}"
+        getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
+            .putString("$base:sortKey", sortKey.name)
+            .putBoolean("$base:sortAsc", sortAsc)
+            .putString("$base:query", q)
+            .putInt("$base:firstPos", first)
+            .putInt("$base:offset", topOffset)
+            .apply()
+    }
+
+    private fun restoreLastViewState() {
+        val p = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+        val base = "viewstate:${keyId}"
+
+        val savedKey = p.getString("$base:sortKey", SortKey.NONE.name) ?: SortKey.NONE.name
+        sortKey = runCatching { SortKey.valueOf(savedKey) }.getOrElse { SortKey.NONE }
+        sortAsc = p.getBoolean("$base:sortAsc", true)
+
+        val q = p.getString("$base:query", "") ?: ""
+        if (q.isNotEmpty()) {
+            if (searchBar == null) createSearchBar()
+            searchBar?.visibility = View.VISIBLE
+            searchEdit?.setText(q)
+            searchEdit?.setSelection(q.length)
+        } else {
+            rows = allRows.toMutableList()
+            adapter.updateData(rows)
+            sortInBlocks()
+        }
+
+        val hdrNo = findViewById<TextView?>(R.id.tvNoHeader)
+        val hdrBL = findViewById<TextView>(R.id.tvBLHeader)
+        val hdrHaju = findViewById<TextView>(R.id.tvHajuHeader)
+        val hdrCar = findViewById<TextView>(R.id.tvCarInfoHeader)
+        val hdrQty = findViewById<TextView>(R.id.tvQtyHeader)
+        val hdrClear = findViewById<TextView>(R.id.tvClearHeader)
+        val hdrCheck = findViewById<TextView>(R.id.tvCheckHeader)
+        setHeaderIndicators(hdrNo, hdrBL, hdrHaju, hdrCar, hdrQty, hdrClear, hdrCheck)
+
+        val first = p.getInt("$base:firstPos", 0)
+        val offset = p.getInt("$base:offset", 0)
+        recycler.post { (recycler.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(first, offset) }
+    }
+
+    // ===== 유틸 =====
+    private fun applyUiToHeader(cfgRaw: UiConfig) {
+        val cfg = cfgRaw.normalized()
+        fun setW(id: Int, w: Float) {
+            val tv = findViewById<TextView?>(id) ?: return
+            (tv.layoutParams as? LinearLayout.LayoutParams)?.let { it.weight = w; tv.layoutParams = it }
+        }
+        setW(R.id.tvNoHeader, cfg.wNo); setW(R.id.tvBLHeader, cfg.wBL); setW(R.id.tvHajuHeader, cfg.wHaju)
+        setW(R.id.tvCarInfoHeader, cfg.wCar); setW(R.id.tvQtyHeader, cfg.wQty); setW(R.id.tvClearHeader, cfg.wClear); setW(R.id.tvCheckHeader, cfg.wCheck)
+    }
+
+    private fun applyDivider(show: Boolean) {
+        rowDivider?.let { recycler.removeItemDecoration(it); rowDivider = null }
+        if (show) { rowDivider = DividerItemDecoration(this, LinearLayoutManager.VERTICAL); recycler.addItemDecoration(rowDivider!!) }
+    }
+
+    private fun showLoading(show: Boolean) {
+        progress.visibility = if (show) View.VISIBLE else View.GONE
+        recycler.visibility = if (show) View.INVISIBLE else View.VISIBLE
+    }
+
     private fun dp(v: View, dp: Float) = (dp * v.context.resources.displayMetrics.density).toInt()
+
+    // ===== 엑셀 파싱 =====
+    private fun readExcel(file: File): List<CheckRow> {
+        val out = mutableListOf<CheckRow>()
+        try {
+            FileInputStream(file).use { fis ->
+                val wb = if (file.name.endsWith(".xls", true)) HSSFWorkbook(fis) else XSSFWorkbook(fis)
+                val sheet = wb.getSheetAt(0)
+                val fmt = DataFormatter()
+                for (r in DEF_DATA_START..sheet.lastRowNum) {
+                    val row = sheet.getRow(r) ?: continue
+                    val bl = getRaw(fmt, row, DEF_BL).trim()
+                    val haju = getRaw(fmt, row, DEF_HAJU).trim()
+                    val descRaw = getRaw(fmt, row, DEF_CAR)
+                    val qty = getRaw(fmt, row, DEF_QTY).trim()
+                    val clearance = getRaw(fmt, row, DEF_CLEAR).trim()
+                    if (bl.isEmpty() && haju.isEmpty() && descRaw.isEmpty() && qty.isEmpty()) continue
+                    if (bl.startsWith("TERMINAL", true)) { out.add(CheckRow(bl, "", "", "", "", isLabelRow = true)); continue }
+                    val carInfo = cleanMultiline(descRaw)
+                    out.add(CheckRow(bl, haju, carInfo, qty, clearance))
+                }
+                wb.close()
+            }
+        } catch (e: Exception) { e.printStackTrace() }
+        return out
+    }
+
+    private fun getRaw(fmt: DataFormatter, row: org.apache.poi.ss.usermodel.Row, idx: Int): String {
+        val c = row.getCell(idx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL) ?: return ""
+        return fmt.formatCellValue(c)
+    }
+
+    private fun cleanMultiline(src: String): String {
+        val normalized = src.replace("\r\n", "\n").replace('\r', '\n')
+        val specialSpaces = Regex("[\\u00A0\\u2007\\u202F\\u200B\\t]")
+        return normalized.trim('\n', ' ', '\t', '\r')
+            .split('\n').map { it.replace(specialSpaces, " ").trim() }
+            .filter { it.isNotEmpty() && !it.equals("USED CAR", true) }
+            .joinToString("\n")
+    }
+
+    // ===== 라이프사이클 =====
+    override fun onResume() {
+        super.onResume()
+        if (this::adapter.isInitialized) updateStatus()
+        LogBus.appOpen("차체크화면")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        saveCheckState()
+        saveLastViewState()
+        updateStatus()
+        pushStatusToHomeAndBroadcast()
+        LogBus.appClose("차체크화면")
+    }
+
+    private fun saveCheckState() {
+        val e = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit()
+        allRows.forEachIndexed { idx, r ->
+            if (!r.isLabelRow) {
+                val base = "check_orders:${ParsedCache.keyFor(currentFile).id()}:$idx"
+                e.putBoolean("${base}_checked", r.isChecked)
+                e.putInt("${base}_order", r.checkOrder)
+            }
+        }
+        e.apply()
+    }
 }

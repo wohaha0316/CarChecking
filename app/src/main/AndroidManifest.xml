@@ -49,7 +49,8 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
-
+        <activity android:name=".FileActionsActivity" android:exported="false" />
+        <activity android:name=".SpecSummaryActivity" android:exported="false" />
         <!-- 파일 공유용 FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -239,7 +239,12 @@ class MainActivity : AppCompatActivity() {
             ellipsize = TextUtils.TruncateAt.END
             textSize = 16f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setOnClickListener { /* 클릭 없음 */ }
+            // ✅ 여기! 현황 화면으로 이동
+            setOnClickListener {
+                val intent = Intent(this@MainActivity, SpecSummaryActivity::class.java)
+                intent.putExtra("filePath", file.absolutePath)
+                startActivity(intent)
+            }
         }
 
         bottomRow.addView(statusBtn)
