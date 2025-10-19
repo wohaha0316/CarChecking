@@ -21,10 +21,7 @@ object VinIndexManager {
             VinUtils.extractCandidates(txt).forEach { vin ->
                 val hit = Hit(fileKey, filePath, idx, r.bl)
                 val list = vinMap.getOrPut(vin) { mutableListOf() }
-                // 동일 (fileKey, rowIndex) 중복 방지
-                if (list.none { it.fileKey == fileKey && it.rowIndex == idx }) {
-                    list.add(hit)
-                }
+                if (list.none { it.fileKey == fileKey && it.rowIndex == idx }) list.add(hit)
             }
         }
     }
@@ -39,8 +36,17 @@ object VinIndexManager {
     fun findInOthers(currentKey: String, vin: String): List<Hit> {
         val list = vinMap[vin] ?: return emptyList()
         return list.filter { it.fileKey != currentKey }.sortedBy { hit ->
-            // ‘최근’ 판단: files 삽입 순서 기준(후입 우선)
             files.keys.indexOf(hit.fileKey)
         }.reversed()
+    }
+
+    // ===== 기타 헬퍼(다른 리스트 검색용) =====
+    fun hasFileKey(key: String) = files.containsKey(key)
+    fun hasFilePath(path: String) = files.values.any { it.path == path }
+    fun filePathFor(key: String): String? = files[key]?.path
+
+    /** 모든 인덱싱된 파일 순회 */
+    fun forEachIndexedFile(block: (fileKey: String, filePath: String, rows: List<CheckRow>) -> Unit) {
+        files.forEach { (k, meta) -> block(k, meta.path, meta.rows) }
     }
 }

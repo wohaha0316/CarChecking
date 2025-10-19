@@ -1,7 +1,22 @@
+<!-- res/layout/activity_check_list.xml -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
+
+    <!-- ✅ 현재 열려있는 엑셀 파일명 표시 -->
+    <TextView
+        android:id="@+id/tvFileName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="파일명.xls"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:background="#F2F2F2"
+        android:textColor="#333333" />
 
     <!-- 상단 고정 헤더 -->
     <include layout="@layout/header_check_row"/>
@@ -15,22 +30,24 @@
         android:padding="6dp"
         android:text="전체 0 대  면장X 0 대  확인 0 대"
         android:textSize="14sp"
-        android:background="#EEEEEE"/>
+        android:background="#EEEEEE" />
 
-    <!-- 리스트 -->
+    <!-- 메인 리스트 (현재리스트 + 회색박스 섹션은 ConcatAdapter로 같이 스크롤) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerViewCheck"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1" />
+
     <ProgressBar
         android:id="@+id/progress"
         style="?android:attr/progressBarStyleSmall"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:visibility="gone"/>
-    <!-- ✅ 하단 검색창 (기본 GONE, 키보드 위에 올라오도록) -->
+        android:visibility="gone" />
+
+    <!-- 하단 검색창 -->
     <LinearLayout
         android:id="@+id/searchBar"
         android:orientation="horizontal"
@@ -45,14 +62,14 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="검색어 입력"
-            android:imeOptions="actionDone"/>
+            android:hint="검색어 입력 (B/L, 화주, 차량정보)"
+            android:imeOptions="actionDone" />
 
         <Button
             android:id="@+id/btnClearSearch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="X"/>
+            android:text="X" />
     </LinearLayout>
 
     <!-- 하단 버튼 -->
@@ -67,20 +84,21 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="정렬"/>
+            android:text="정렬" />
 
         <Button
             android:id="@+id/btnSearch"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="찾기"/>
+            android:text="찾기" />
 
         <Button
             android:id="@+id/btnCamera"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="카메라"/>
+            android:text="카메라" />
     </LinearLayout>
+
 </LinearLayout>
