@@ -1,40 +1,15 @@
 import java.util.Properties
 
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("com.google.devtools.ksp")
+}
+
 val ksProps = Properties()
 val ksFile = rootProject.file("keystore.properties")
 val hasKeystore = ksFile.exists()
 if (hasKeystore) ksFile.inputStream().use { ksProps.load(it) }
-
-android {
-    signingConfigs {
-        if (hasKeystore) {
-            create("release") {
-                storeFile = file(ksProps["storeFile"] ?: "")
-                storePassword = ksProps["storePassword"] as String?
-                keyAlias = ksProps["keyAlias"] as String?
-                keyPassword = ksProps["keyPassword"] as String?
-            }
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-            // keystore 있을 때만 서명 사용
-            if (hasKeystore) {
-                signingConfig = signingConfigs.getByName("release")
-            }
-        }
-        getByName("debug") {
-            // 디버그는 기본 debug keystore 사용
-        }
-    }
-}
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    // ✅ KSP 사용 (KAPT 쓰지 않음)
-    id("com.google.devtools.ksp") version "1.9.24-1.0.20"
-}
 
 android {
     namespace = "com.example.carchecking"
@@ -48,27 +23,48 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        if (hasKeystore) {
+            create("release") {
+                storeFile = file(ksProps["storeFile"] ?: "")
+                storePassword = ksProps["storePassword"] as String?
+                keyAlias = ksProps["keyAlias"] as String?
+                keyPassword = ksProps["keyPassword"] as String?
+            }
+        }
+    }
+
     buildTypes {
-        debug { }
+        debug {
+            // 디버그는 기본 debug keystore 사용
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // keystore 있을 때만 서명 사용
+            if (hasKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
-    buildFeatures { viewBinding = true }
+    buildFeatures {
+        viewBinding = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
-/** 🔧 annotation-experimental 충돌 방지 (있으면 유효) */
+/** 🔧 annotation-experimental 충돌 방지 */
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "androidx.annotation" && requested.name == "annotation-experimental") {
@@ -104,12 +100,12 @@ dependencies {
     implementation("org.apache.poi:poi-ooxml:5.2.5")
     implementation("org.apache.xmlbeans:xmlbeans:5.1.1")
 
-    // ✅ Room (KSP 사용)
+    // ✅ Room (KSP)
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // (선택) 명시적으로 하나만 쓰기
+    // 명시적으로 하나만 유지
     implementation("androidx.annotation:annotation-experimental:1.4.0")
 
     // CameraX
@@ -123,4 +119,6 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.0")
 }
 
-kotlin { jvmToolchain(17) }
+kotlin {
+    jvmToolchain(17)
+}
