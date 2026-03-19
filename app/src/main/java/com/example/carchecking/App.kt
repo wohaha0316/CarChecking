@@ -32,5 +32,12 @@ class App : Application() {
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             Log.e("App", "Uncaught in ${t.name}", e)
         }
+
+        runCatching {
+            SpecMaster.ensureLoaded(this)
+            Log.d("App", "Spec master loaded: ${SpecMaster.size()} keys")
+        }.onFailure { e ->
+            Log.e("App", "Spec master load failed", e)
+        }
     }
 }

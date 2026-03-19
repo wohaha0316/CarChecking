@@ -169,14 +169,16 @@ class SpecSummaryActivity : AppCompatActivity() {
         summaryContainer.removeAllViews()
 
         // 헤더
-        summaryContainer.addView(makeRow(
-            listOf("구간(전장 m)", "1.9 이상", "1.8~1.9", "1.8 이하", "합계"),
-            isHeader = true
-        ))
+        summaryContainer.addView(
+            makeRow(
+                listOf("구간(전장 m)", "1.9 이상", "1.8~1.9", "1.8 이하", "합계"),
+                isHeader = true
+            )
+        )
 
         // 바디
         for (i in buckets.indices) {
-            val g = grid.getOrNull(i) ?: intArrayOf(0,0,0)
+            val g = grid.getOrNull(i) ?: intArrayOf(0, 0, 0)
             val total = g.sum()
             val cells = listOf(
                 buckets[i].label,
@@ -190,16 +192,45 @@ class SpecSummaryActivity : AppCompatActivity() {
             summaryContainer.addView(rowView)
         }
 
+        // 정보없음 행
+        val unknownCount = SpecBucketer.unknownCount(details)
+        val unknownRow = makeRow(
+            listOf("정보없음", "0", "0", unknownCount.toString(), unknownCount.toString()),
+            isHeader = false
+        )
+        unknownRow.setOnClickListener { onUnknownClick() }
+        summaryContainer.addView(unknownRow)
+
         // 합계 행
         val sumCols = IntArray(3)
-        grid.forEach { g -> for (c in 0 until 3) sumCols[c] += g.getOrElse(c) {0} }
-        val grand = sumCols.sum()
-        summaryContainer.addView(makeRow(
-            listOf("합계", sumCols[0].toString(), sumCols[1].toString(), sumCols[2].toString(), grand.toString()),
-            isHeader = true
-        ))
-    }
+        grid.forEach { g ->
+            for (c in 0 until 3) {
+                sumCols[c] += g.getOrElse(c) { 0 }
+            }
+        }
 
+        // 정보없음은 별도 줄이라 합계에도 포함
+        sumCols[2] += unknownCount
+        val grand = sumCols.sum()
+
+        summaryContainer.addView(
+            makeRow(
+                listOf(
+                    "합계",
+                    sumCols[0].toString(),
+                    sumCols[1].toString(),
+                    sumCols[2].toString(),
+                    grand.toString()
+                ),
+                isHeader = true
+            )
+        )
+    }
+    private fun onUnknownClick() {
+        val picked = SpecBucketer.unknownDetails(details)
+        detailsAdapter.submit(picked)
+        Toast.makeText(this, "정보없음 상세 ${picked.size}건", Toast.LENGTH_SHORT).show()
+    }
     private fun onBucketClick(idx: Int) {
         val b = buckets[idx]
         val picked = details.filter { d ->
