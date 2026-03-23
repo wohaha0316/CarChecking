@@ -11,28 +11,32 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Room DB
  * v1 -> v2: notes 테이블 신설 (+ unique index fileKey,rowIndex)
  * v2 -> v3: spec_override 테이블 신설 (+ index(fileKey), index(bl))
+ * v3 -> v4: vehicle_master 테이블 신설
  */
 @Database(
     entities = [
         CheckEvent::class,
         Note::class,
-        SpecOverride::class // ★ v3 신규 엔티티
+        SpecOverride::class,
+        VehicleMaster::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun events(): CheckEventDao
     abstract fun notes(): NoteDao
-    abstract fun specOverrides(): SpecOverrideDao // ★ v3 신규 DAO
+    abstract fun specOverrides(): SpecOverrideDao
+    abstract fun vehicleMasters(): VehicleMasterDao
 
     companion object {
-        @Volatile private var INSTANCE: AppDatabase? = null
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
 
-        // v1 -> v2
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("""
+                db.execSQL(
+                    """
                     CREATE TABLE IF NOT EXISTS `notes` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         `fileKey` TEXT NOT NULL,
@@ -41,18 +45,21 @@ abstract class AppDatabase : RoomDatabase() {
                         `text` TEXT NOT NULL,
                         `updatedTs` INTEGER NOT NULL
                     )
-                """.trimIndent())
-                db.execSQL("""
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
                     CREATE UNIQUE INDEX IF NOT EXISTS `index_notes_fileKey_rowIndex`
                     ON `notes`(`fileKey`,`rowIndex`)
-                """.trimIndent())
+                    """.trimIndent()
+                )
             }
         }
 
-        // ★ v2 -> v3: 제원 수동입력 저장용 테이블 생성
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("""
+                db.execSQL(
+                    """
                     CREATE TABLE IF NOT EXISTS `spec_override` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         `fileKey` TEXT NOT NULL,
@@ -62,9 +69,47 @@ abstract class AppDatabase : RoomDatabase() {
                         `widthMm` INTEGER,
                         `updatedTs` INTEGER NOT NULL
                     )
-                """.trimIndent())
-                db.execSQL("""CREATE INDEX IF NOT EXISTS `index_spec_override_fileKey` ON `spec_override`(`fileKey`)""")
-                db.execSQL("""CREATE INDEX IF NOT EXISTS `index_spec_override_bl` ON `spec_override`(`bl`)""")
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_spec_override_fileKey` ON `spec_override`(`fileKey`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_spec_override_bl` ON `spec_override`(`bl`)"
+                )
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `vehicle_master` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `brand` TEXT NOT NULL,
+                        `model` TEXT NOT NULL,
+                        `lengthMm` INTEGER NOT NULL,
+                        `widthMm` INTEGER NOT NULL,
+                        `normalizedKey` TEXT NOT NULL,
+                        `createdTs` INTEGER NOT NULL,
+                        `updatedTs` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS `index_vehicle_master_brand_model`
+                    ON `vehicle_master`(`brand`,`model`)
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS `index_vehicle_master_normalizedKey`
+                    ON `vehicle_master`(`normalizedKey`)
+                    """.trimIndent()
+                )
             }
         }
 
@@ -75,8 +120,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "carchecking.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // ★ 마이그레이션 모두 적용
-                    // .fallbackToDestructiveMigration() // 필요 시 테스트용으로만 잠깐 사용
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }

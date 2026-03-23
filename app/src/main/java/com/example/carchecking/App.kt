@@ -4,6 +4,9 @@ import android.app.Application
 import android.content.pm.ApplicationInfo
 import android.os.StrictMode
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class App : Application() {
     override fun onCreate() {
@@ -33,11 +36,13 @@ class App : Application() {
             Log.e("App", "Uncaught in ${t.name}", e)
         }
 
-        runCatching {
-            SpecMaster.ensureLoaded(this)
-            Log.d("App", "Spec master loaded: ${SpecMaster.size()} keys")
-        }.onFailure { e ->
-            Log.e("App", "Spec master load failed", e)
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                VehicleMasterRepository.ensureSeeded(this@App)
+                Log.d("App", "Vehicle master seeded + loaded")
+            }.onFailure {
+                Log.e("App", "Vehicle master init failed", it)
+            }
         }
     }
 }

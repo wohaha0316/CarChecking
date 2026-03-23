@@ -1,5 +1,6 @@
 package com.example.carchecking
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.text.InputFilter
@@ -51,7 +52,6 @@ class SpecSummaryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ===== 레이아웃 (코드로 구성) =====
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -70,19 +70,26 @@ class SpecSummaryActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
+
         btnCrud = Button(this).apply {
             text = "제원정리 표"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener {
+                startActivity(Intent(this@SpecSummaryActivity, VehicleMasterActivity::class.java))
+            }
         }
+
         btnSettings = Button(this).apply {
             text = "설정"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setOnClickListener { showSettings() }
         }
-        top.addView(btnCrud); top.addView(btnSettings)
+
+        top.addView(btnCrud)
+        top.addView(btnSettings)
         root.addView(top)
 
-        // 2줄: 현황 카운터 텍스트 (Main과 동일 포맷)
+        // 2줄: 현황 카운터
         tvCounters = TextView(this).apply {
             textSize = 16f
             setPadding(dp(4))
@@ -102,16 +109,29 @@ class SpecSummaryActivity : AppCompatActivity() {
         // 4줄: 상세 Recycler
         rvDetails = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@SpecSummaryActivity)
-            addItemDecoration(DividerItemDecoration(this@SpecSummaryActivity, DividerItemDecoration.VERTICAL))
+            addItemDecoration(
+                DividerItemDecoration(
+                    this@SpecSummaryActivity,
+                    DividerItemDecoration.VERTICAL
+                )
+            )
         }
         detailsAdapter = DetailAdapter()
         rvDetails.adapter = detailsAdapter
-        root.addView(rvDetails, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
+        root.addView(
+            rvDetails,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
 
-        // ===== 데이터 로딩 =====
-        val path = intent.getStringExtra(EXTRA_FILE_PATH) ?: run { finish(); return }
+        val path = intent.getStringExtra(EXTRA_FILE_PATH) ?: run {
+            finish()
+            return
+        }
+
         currentFile = File(path)
         keyId = ParsedCache.keyFor(currentFile).id()
         db = AppDatabase.get(this)
@@ -120,16 +140,13 @@ class SpecSummaryActivity : AppCompatActivity() {
         lifecycleScope.launch {
             rows = withContext(Dispatchers.IO) {
                 val cacheKey = ParsedCache.keyFor(currentFile)
-                val cached = ParsedCache.read(filesDir, cacheKey)
-                (cached ?: emptyList())
-            } ?: emptyList()
+                ParsedCache.read(filesDir, cacheKey) ?: emptyList()
+            }
 
-            // counters
             tvCounters.text = fromHtmlCompat(
                 CheckListCounters.buildStatusHtml(this@SpecSummaryActivity, keyId)
             )
 
-            // 요약 생성
             rebuildSummary()
         }
     }
@@ -141,10 +158,15 @@ class SpecSummaryActivity : AppCompatActivity() {
             10 -> 2
             else -> 0
         }
+
         AlertDialog.Builder(this)
             .setTitle("설정")
-            .setSingleChoiceItems(items, initial) { d, which ->
-                stepCm = when (which) { 1 -> 15; 2 -> 10; else -> 20 }
+            .setSingleChoiceItems(items, initial) { _, which ->
+                stepCm = when (which) {
+                    1 -> 15
+                    2 -> 10
+                    else -> 20
+                }
             }
             .setPositiveButton("적용") { _, _ -> rebuildSummary() }
             .setNegativeButton("취소", null)
@@ -156,12 +178,13 @@ class SpecSummaryActivity : AppCompatActivity() {
             val overrides = withContext(Dispatchers.IO) {
                 ovDao.listByFile(keyId).associateBy { it.bl }
             }
+
             buckets = SpecBucketer.buildLenBuckets(stepCm)
             details = SpecBucketer.buildDetails(keyId, rows, overrides)
             grid = SpecBucketer.summarize(buckets, details)
 
-            drawSummaryGrid() // 표시
-            detailsAdapter.submit(emptyList()) // 상세 초기화
+            drawSummaryGrid()
+            detailsAdapter.submit(emptyList())
         }
     }
 
@@ -209,7 +232,7 @@ class SpecSummaryActivity : AppCompatActivity() {
             }
         }
 
-        // 정보없음은 별도 줄이라 합계에도 포함
+        // 정보없음은 1.8 이하 칸에 몰아서 합계 반영
         sumCols[2] += unknownCount
         val grand = sumCols.sum()
 
@@ -226,26 +249,30 @@ class SpecSummaryActivity : AppCompatActivity() {
             )
         )
     }
-    private fun onUnknownClick() {
-        val picked = SpecBucketer.unknownDetails(details)
-        detailsAdapter.submit(picked)
-        Toast.makeText(this, "정보없음 상세 ${picked.size}건", Toast.LENGTH_SHORT).show()
-    }
+
     private fun onBucketClick(idx: Int) {
         val b = buckets[idx]
         val picked = details.filter { d ->
             val l = d.lenMm ?: return@filter false
+            val w = d.widthMm ?: return@filter false
+            if (SpecBucketer.widthBand(w) < 0) return@filter false
+
             when {
                 b.minMm != null && b.maxMm == null -> l >= b.minMm
                 b.minMm == null && b.maxMm != null -> l < b.maxMm
                 else -> l in (b.minMm!! until b.maxMm!!)
             }
         }
+
         detailsAdapter.submit(picked)
         Toast.makeText(this, "${b.label} 상세 ${picked.size}건", Toast.LENGTH_SHORT).show()
     }
 
-    // ===== Utils =====
+    private fun onUnknownClick() {
+        val picked = SpecBucketer.unknownDetails(details)
+        detailsAdapter.submit(picked)
+        Toast.makeText(this, "정보없음 상세 ${picked.size}건", Toast.LENGTH_SHORT).show()
+    }
 
     private fun makeRow(cells: List<String>, isHeader: Boolean): LinearLayout {
         val row = LinearLayout(this).apply {
@@ -253,25 +280,34 @@ class SpecSummaryActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, dp(4), 0, dp(4)) }
+            ).apply {
+                setMargins(0, dp(4), 0, dp(4))
+            }
         }
-        val weights = floatArrayOf(1.7f, 1f, 1f, 1f, 1f) // 가로스크롤 없이 맞춤
+
+        val weights = floatArrayOf(1.7f, 1f, 1f, 1f, 1f)
+
         cells.forEachIndexed { i, s ->
             val tv = TextView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weights[i])
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    weights[i]
+                )
                 text = s
                 gravity = Gravity.CENTER
                 setPadding(dp(6))
                 setBackgroundColor(Color.parseColor(if (isHeader) "#EEEEEE" else "#FFFFFF"))
                 setTextColor(Color.parseColor("#000000"))
             }
+
             tv.background = android.graphics.drawable.ShapeDrawable().apply {
                 paint.color = Color.TRANSPARENT
             }
-            // 테두리(얇은 회색)
             tv.setBackgroundResource(android.R.drawable.editbox_background_normal)
             row.addView(tv)
         }
+
         return row
     }
 
@@ -281,8 +317,6 @@ class SpecSummaryActivity : AppCompatActivity() {
         return getSharedPreferences("carchecking_prefs", MODE_PRIVATE)
             .getBoolean("ship_orders:${keyId}:${idx}_shipped", false)
     }
-
-    // ===== 상세 어댑터 =====
 
     inner class DetailAdapter : RecyclerView.Adapter<DetailVH>() {
         private var data: List<SpecBucketer.Detail> = emptyList()
@@ -301,18 +335,25 @@ class SpecSummaryActivity : AppCompatActivity() {
                 )
                 setPadding(dp(6))
             }
+
             fun cell(w: Float) = TextView(parent.context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, w)
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(4))
             }
-            val tvNo = cell(0.6f)
+
+            val tvNo = cell(0.7f)
             val tvBL = cell(1.4f)
-            val tvModel = cell(1.8f)
+            val tvModel = cell(2.2f)
             val tvLen = cell(0.8f)
             val tvWid = cell(0.8f)
 
-            row.addView(tvNo); row.addView(tvBL); row.addView(tvModel); row.addView(tvLen); row.addView(tvWid)
+            row.addView(tvNo)
+            row.addView(tvBL)
+            row.addView(tvModel)
+            row.addView(tvLen)
+            row.addView(tvWid)
+
             return DetailVH(row, tvNo, tvBL, tvModel, tvLen, tvWid).also { vh ->
                 row.setOnLongClickListener {
                     val d = data.getOrNull(vh.bindingAdapterPosition) ?: return@setOnLongClickListener false
@@ -327,31 +368,43 @@ class SpecSummaryActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: DetailVH, position: Int) {
             val d = data[position]
             val seq = position + 1
-            holder.no.text = seq.toString()
+
             holder.bl.text = d.row.bl
-            holder.model.text = d.row.haju + " " + firstLine(d.row.carInfo)
+            holder.model.text = firstLine(d.row.carInfo)
 
             holder.len.text = d.lenMm?.let { String.format("%.2f", it / 1000.0) } ?: "-"
             holder.wid.text = d.widthMm?.let { String.format("%.2f", it / 1000.0) } ?: "-"
 
-            // 색칠 규칙
             val shipped = readShipState(d.rowIndex)
             val clr = when {
-                shipped -> Color.parseColor("#008000") // 초록
-                d.row.clearance.equals("X", true) -> Color.parseColor("#CC0000") // 빨강
-                d.row.isChecked -> Color.parseColor("#1E90FF") // 파랑
+                shipped -> Color.parseColor("#008000")
+                d.row.clearance.equals("X", true) -> Color.parseColor("#CC0000")
+                d.row.isChecked -> Color.parseColor("#1E90FF")
                 else -> Color.TRANSPARENT
             }
+
             holder.itemView.setBackgroundColor(if (clr == Color.TRANSPARENT) Color.WHITE else clr)
             val textColor = if (clr == Color.TRANSPARENT) Color.BLACK else Color.WHITE
-            listOf(holder.no, holder.bl, holder.model, holder.len, holder.wid).forEach { it.setTextColor(textColor) }
+            listOf(holder.no, holder.bl, holder.model, holder.len, holder.wid).forEach {
+                it.setTextColor(textColor)
+            }
 
-            // 출처 뱃지
-            val badge = when (d.source) { 'O' -> "O"; 'T' -> "T"; else -> "-" }
+            val badge = when (d.source) {
+                'O' -> "O"
+                'T' -> "T"
+                'M' -> "M"
+                else -> "-"
+            }
             holder.no.text = "$seq($badge)"
         }
 
-        private fun firstLine(s: String) = s.replace("\r\n", "\n").replace('\r','\n').lineSequence().firstOrNull().orEmpty()
+        private fun firstLine(s: String): String {
+            return s.replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .lineSequence()
+                .firstOrNull()
+                .orEmpty()
+        }
     }
 
     class DetailVH(
@@ -363,13 +416,12 @@ class SpecSummaryActivity : AppCompatActivity() {
         val wid: TextView
     ) : RecyclerView.ViewHolder(v)
 
-    // ===== 입력 다이얼로그 =====
-
     private fun showOverrideDialog(d: SpecBucketer.Detail) {
         val wrap = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12))
         }
+
         fun input(hint: String, init: String?): EditText {
             return EditText(this).apply {
                 this.hint = hint
@@ -378,6 +430,7 @@ class SpecSummaryActivity : AppCompatActivity() {
                 setText(init ?: "")
             }.also { wrap.addView(it) }
         }
+
         val etLen = input("전장(mm, 예: 5179)", d.lenMm?.toString())
         val etWid = input("전폭(mm, 예: 1956)", d.widthMm?.toString())
 
@@ -394,13 +447,17 @@ class SpecSummaryActivity : AppCompatActivity() {
             .setPositiveButton("저장") { _, _ ->
                 val len = etLen.text.toString().toIntOrNull()
                 val wid = etWid.text.toString().toIntOrNull()
+
                 lifecycleScope.launch(Dispatchers.IO) {
                     val old = db.specOverrides().get(keyId, d.row.bl)
                     val ov = (old ?: SpecOverride(fileKey = keyId, bl = d.row.bl)).copy(
-                        lenMm = len, widthMm = wid, updatedTs = System.currentTimeMillis()
+                        lenMm = len,
+                        widthMm = wid,
+                        updatedTs = System.currentTimeMillis()
                     )
                     if (old == null) db.specOverrides().insert(ov) else db.specOverrides().update(ov)
                 }
+
                 LogBus.logRaw("제원 입력: ${d.row.bl} ${len ?: "-"} / ${wid ?: "-"}")
                 rebuildSummary()
             }
